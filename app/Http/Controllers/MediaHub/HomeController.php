@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,13 +17,14 @@
 namespace App\Http\Controllers\MediaHub;
 
 use App\Http\Controllers\Controller;
-use App\Models\Collection;
-use App\Models\Company;
-use App\Models\Genre;
-use App\Models\Movie;
-use App\Models\Network;
-use App\Models\Person;
-use App\Models\Tv;
+use App\Models\Category;
+use App\Models\TmdbCollection;
+use App\Models\TmdbCompany;
+use App\Models\TmdbGenre;
+use App\Models\TmdbMovie;
+use App\Models\TmdbNetwork;
+use App\Models\TmdbPerson;
+use App\Models\TmdbTv;
 
 class HomeController extends Controller
 {
@@ -29,22 +33,16 @@ class HomeController extends Controller
      */
     public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $tv = Tv::count();
-        $movies = Movie::count();
-        $collections = Collection::count();
-        $persons = Person::whereNotNull('still')->count();
-        $genres = Genre::count();
-        $networks = Network::count();
-        $companies = Company::count();
-
-        return \view('mediahub.index', [
-            'tv'          => $tv,
-            'movies'      => $movies,
-            'collections' => $collections,
-            'persons'     => $persons,
-            'genres'      => $genres,
-            'networks'    => $networks,
-            'companies'   => $companies,
+        return view('mediahub.index', [
+            'tv'               => TmdbTv::count(),
+            'movies'           => TmdbMovie::count(),
+            'movieCategoryIds' => Category::where('movie_meta', '=', 1)->pluck('id')->toArray(),
+            'tvCategoryIds'    => Category::where('tv_meta', '=', 1)->pluck('id')->toArray(),
+            'collections'      => TmdbCollection::count(),
+            'persons'          => TmdbPerson::whereNotNull('still')->count(),
+            'genres'           => TmdbGenre::count(),
+            'networks'         => TmdbNetwork::count(),
+            'companies'        => TmdbCompany::count(),
         ]);
     }
 }

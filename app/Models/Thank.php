@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,6 +19,8 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Thank.
@@ -25,40 +30,33 @@ use Illuminate\Database\Eloquent\Model;
  * @property int                             $torrent_id
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\Torrent $torrent
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Thank newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Thank newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Thank query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Thank whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Thank whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Thank whereTorrentId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Thank whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Thank whereUserId($value)
- * @mixin \Eloquent
  */
-class Thank extends Model
+#[AllowDynamicProperties]
+final class Thank extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\ThankFactory> */
+    use HasFactory;
+
+    protected $guarded = [];
+
     /**
-     * Belongs To A Torrent.
+     * Get the torrent that was thanked.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Torrent, $this>
      */
-    public function torrent()
+    public function torrent(): BelongsTo
     {
         return $this->belongsTo(Torrent::class);
     }
 
     /**
-     * Belongs To A User.
+     * Get the user that thanked.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }

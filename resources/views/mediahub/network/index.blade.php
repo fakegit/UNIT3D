@@ -1,39 +1,26 @@
-@extends('layout.default')
+@extends('layout.with-main')
 
 @section('title')
-    <title>@lang('mediahub.networks') - {{ config('other.title') }}</title>
+    <title>{{ __('mediahub.networks') }} - {{ config('other.title') }}</title>
 @endsection
 
 @section('meta')
-    <meta name="description" content="@lang('mediahub.networks')">
+    <meta name="description" content="{{ __('mediahub.networks') }}" />
 @endsection
 
-@section('breadcrumb')
-    <li>
-        <a href="{{ route('mediahub.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('mediahub.title')</span>
+@section('breadcrumbs')
+    <li class="breadcrumbV2">
+        <a href="{{ route('mediahub.index') }}" class="breadcrumb__link">
+            {{ __('mediahub.title') }}
         </a>
     </li>
-    <li class="active">
-        <a href="{{ route('mediahub.networks.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('mediahub.networks')</span>
-        </a>
+    <li class="breadcrumb--active">
+        {{ __('mediahub.networks') }}
     </li>
 @endsection
 
-@section('content')
-    <div class="container">
-        <div class="block">
-            <div class="header gradient silver">
-                <div class="inner_content">
-                    <div class="page-title">
-                        <h1 style="margin: 0;">@lang('mediahub.networks')</h1>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="box container">
-        @livewire('network-search')
-    </div>
+@section('page', 'page__network--index')
+
+@section('main')
+    @livewire('tmdb-network-search')
 @endsection

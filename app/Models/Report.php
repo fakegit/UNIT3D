@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,6 +19,8 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Report.
@@ -23,110 +28,106 @@ use Illuminate\Database\Eloquent\Model;
  * @property int                             $id
  * @property string                          $type
  * @property int                             $reporter_id
- * @property int|null                        $staff_id
+ * @property int                             $reported_user_id
+ * @property int                             $reported_torrent_id
+ * @property int                             $reported_request_id
  * @property string                          $title
  * @property string                          $message
- * @property int                             $solved
+ * @property int|null                        $solved_by
+ * @property int|null                        $assigned_to
  * @property string|null                     $verdict
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property int                             $reported_user
- * @property int                             $torrent_id
- * @property int                             $request_id
- * @property-read \App\Models\User $reported
- * @property-read \App\Models\User $reporter
- * @property-read \App\Models\TorrentRequest $request
- * @property-read \App\Models\User|null $staff
- * @property-read \App\Models\Torrent $torrent
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Report newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Report newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Report query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Report whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Report whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Report whereMessage($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Report whereReportedUser($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Report whereReporterId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Report whereRequestId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Report whereSolved($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Report whereStaffId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Report whereTitle($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Report whereTorrentId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Report whereType($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Report whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Report whereVerdict($value)
- * @mixin \Eloquent
+ * @property int|null                        $reported_user
+ * @property int|null                        $torrent_id
+ * @property int|null                        $request_id
+ * @property \Illuminate\Support\Carbon|null $snoozed_until
  */
-class Report extends Model
+#[AllowDynamicProperties]
+final class Report extends Model
 {
-    use HasFactory;
     use Auditable;
 
-    /**
-     * The Attributes That Aren't Mass Assignable.
-     *
-     * @var array
-     */
-    protected $guarded = [
-        'id',
-    ];
+    /** @use HasFactory<\Database\Factories\ReportFactory> */
+    use HasFactory;
 
     /**
-     * Belongs To A Request.
+     * The attributes that aren't mass assignable.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @var string[]
      */
-    public function request()
+    protected $guarded = ['id', 'created_at', 'updated_at'];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array{snoozed_until: 'datetime', solved_at: 'datetime'}
+     */
+    protected function casts(): array
     {
-        return $this->belongsTo(TorrentRequest::class, 'request_id');
+        return [
+            'snoozed_until' => 'datetime',
+            'solved_at'     => 'datetime',
+        ];
     }
 
     /**
-     * Belongs To A Torrent.
+     * Get the request that was reported.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<TorrentRequest, $this>
      */
-    public function torrent()
+    public function request(): BelongsTo
     {
-        return $this->belongsTo(Torrent::class, 'torrent_id');
+        return $this->belongsTo(TorrentRequest::class, 'reported_request_id');
     }
 
     /**
-     * Belongs To A User.
+     * Get the torrent that was reported.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Torrent, $this>
      */
-    public function reporter()
+    public function torrent(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'reporter_id')->withDefault([
-            'username' => 'System',
-            'id'       => '1',
-        ]);
+        return $this->belongsTo(Torrent::class, 'reported_torrent_id');
     }
 
     /**
-     * Belongs To A User.
+     * Get the user that reported.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function reported()
+    public function reporter(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'reported_user')->withDefault([
-            'username' => 'System',
-            'id'       => '1',
-        ]);
+        return $this->belongsTo(User::class, 'reporter_id')->withTrashed();
     }
 
     /**
-     * Belongs To A Staff Member.
+     * Get the user that was reported.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function staff()
+    public function reported(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'staff_id')->withDefault([
-            'username' => 'System',
-            'id'       => '1',
-        ]);
+        return $this->belongsTo(User::class, 'reported_user_id')->withTrashed();
+    }
+
+    /**
+     * Get the staff user that is assigned to the report.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to')->withTrashed();
+    }
+
+    /**
+     * Get the staff user that solved the report.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function judge(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'solved_by')->withTrashed();
     }
 }

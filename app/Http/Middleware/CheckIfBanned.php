@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -15,30 +18,54 @@ namespace App\Http\Middleware;
 
 use App\Models\Group;
 use Closure;
+use Exception;
 
 class CheckIfBanned
 {
     /**
      * Handle an incoming request.
      *
-     * @param \Illuminate\Http\Request $request
-     * @param string|null              $guard
-     *
-     * @throws \Exception
-     *
-     * @return mixed
+     * @throws Exception
      */
-    public function handle($request, Closure $next, $guard = null)
+    public function handle(\Illuminate\Http\Request $request, Closure $next, ?string $guard = null): mixed
     {
         $user = $request->user();
-        $bannedGroup = \cache()->rememberForever('banned_group', fn () => Group::where('slug', '=', 'banned')->pluck('id'));
+        // Redis returns ints as numeric strings!
+        $bannedGroupId = (int) cache()->rememberForever('group:banned:id', fn () => Group::where('slug', '=', 'banned')->soleValue('id'));
 
-        if ($user && $user->group_id == $bannedGroup[0]) {
-            \auth()->logout();
+        if ($user && $user->group_id === $bannedGroupId) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'message' => __('auth.banned'),
+                ]);
+            }
+
+            if ($request->is('rss/*')) {
+                $message = __('auth.banned');
+                $now = now()->toRssString();
+                $url = config('app.url');
+
+                return response(
+                    <<<XML
+                    <?xml version="1.0" encoding="UTF-8" ?>
+                    <rss version="2.0">
+                        <channel>
+                            <title>{$message}</title>
+                            <link>{$url}</link>
+                            <description>{$message}</description>
+                            <pubDate>{$now}</pubDate>
+                        </channel>
+                    </rss>
+                    XML,
+                    403
+                )->header('Content-Type', 'text/xml');
+            }
+
+            auth()->logout();
             $request->session()->flush();
 
-            return \redirect()->route('login')
-                ->withErrors('This account is Banned!');
+            return to_route('login')
+                ->withErrors(__('auth.banned'));
         }
 
         return $next($request);

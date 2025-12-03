@@ -1,60 +1,47 @@
-@extends('layout.default')
+@extends('layout.with-main')
 
-@section('breadcrumb')
-    <li>
-        <a href="{{ route('staff.dashboard.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('staff.staff-dashboard')</span>
+@section('breadcrumbs')
+    <li class="breadcrumbV2">
+        <a href="{{ route('staff.dashboard.index') }}" class="breadcrumb__link">
+            {{ __('staff.staff-dashboard') }}
         </a>
     </li>
-    <li>
-        <a href="{{ route('staff.pages.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('staff.pages')</span>
+    <li class="breadcrumbV2">
+        <a href="{{ route('staff.pages.index') }}" class="breadcrumb__link">
+            {{ __('staff.pages') }}
         </a>
     </li>
-    <li class="active">
-        <a href="{{ route('staff.types.create') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">
-                @lang('common.add')
-                @lang(trans_choice('common.a-an-art',false))
-                @lang('common.new-adj')
-                @lang('staff.page')
-            </span>
-        </a>
+    <li class="breadcrumb--active">
+        {{ __('common.new-adj') }}
     </li>
 @endsection
 
-@section('content')
-    <div class="container box">
-        <h2>
-            @lang('common.add')
-            @lang(trans_choice('common.a-an-art',false))
-            @lang('common.new-adj')
-            @lang('staff.page')
+@section('page', 'page__staff-page--create')
+
+@section('main')
+    <section class="panelV2">
+        <h2 class="panel__heading">
+            {{ __('common.add') }}
+            {{ trans_choice('common.a-an-art', false) }}
+            {{ __('common.new-adj') }}
+            {{ __('staff.page') }}
         </h2>
-        <form role="form" method="POST" action="{{ route('staff.pages.store') }}">
-            @csrf
-            <div class="form-group">
-                <label for="name">@lang('staff.page') @lang('common.name')</label>
-                <label>
-                    <input type="text" name="name" class="form-control">
-                </label>
-            </div>
-    
-            <div class="form-group">
-                <label for="content">@lang('common.content')</label>
-                <textarea name="content" id="content" cols="30" rows="10" class="form-control"></textarea>
-            </div>
-    
-            <button type="submit" class="btn btn-default">@lang('common.submit')</button>
-        </form>
-    </div>
-@endsection
-
-@section('javascripts')
-    <script nonce="{{ Bepsvpt\SecureHeaders\SecureHeaders::nonce('script') }}">
-        $(document).ready(function() {
-            $('#content').wysibb({});
-        })
-    
-    </script>
+        <div class="panel__body">
+            <form class="form" method="POST" action="{{ route('staff.pages.store') }}">
+                @csrf
+                <p class="form__group">
+                    <input id="name" class="form__text" type="text" name="name" required />
+                    <label class="form__label form__label--floating" for="name">
+                        {{ __('staff.page') }} {{ __('common.name') }}
+                    </label>
+                </p>
+                @livewire('bbcode-input', ['name' => 'content', 'label' => __('common.content'), 'required' => true])
+                <p class="form__group">
+                    <button class="form__button form__button--filled">
+                        {{ __('common.submit') }}
+                    </button>
+                </p>
+            </form>
+        </div>
+    </section>
 @endsection

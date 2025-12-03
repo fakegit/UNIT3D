@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * NOTICE OF LICENSE.
  *
@@ -12,7 +14,6 @@
  */
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Download Check Page
@@ -68,5 +69,4 @@ return [
     */
 
     'magnet' => 0,
-
 ];

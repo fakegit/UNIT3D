@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,7 +19,10 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Poll.
@@ -24,128 +30,86 @@ use Illuminate\Support\Str;
  * @property int                             $id
  * @property int                             $user_id
  * @property string                          $title
- * @property string                          $slug
  * @property int                             $multiple_choice
+ * @property \Illuminate\Support\Carbon|null $expires_at
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Option[] $options
- * @property-read int|null $options_count
- * @property-read \App\Models\User $user
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Voter[] $voters
- * @property-read int|null $voters_count
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Poll newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Poll newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Poll query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Poll whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Poll whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Poll whereMultipleChoice($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Poll whereSlug($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Poll whereTitle($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Poll whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Poll whereUserId($value)
- * @mixin \Eloquent
  */
-class Poll extends Model
+#[AllowDynamicProperties]
+final class Poll extends Model
 {
-    use HasFactory;
     use Auditable;
 
-    /**
-     * The Attributes That Are Mass Assignable.
-     *
-     * @var array
-     */
-    protected $fillable = [
-        'title',
-        'slug',
-        'multiple_choice',
-    ];
+    /** @use HasFactory<\Database\Factories\PollFactory> */
+    use HasFactory;
 
     /**
-     * Belongs To A User.
+     * The attributes that aren't mass assignable.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @var string[]
      */
-    public function user()
+    protected $guarded = [];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array{expires_at: 'datetime'}
+     */
+    protected function casts(): array
+    {
+        return [
+            'expires_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * Get the user that created the poll.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * A Poll Has Many Options.
+     * Get all options for the poll.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<Option, $this>
      */
-    public function options()
+    public function options(): HasMany
     {
         return $this->hasMany(Option::class);
     }
 
     /**
-     * A Poll Has Many Voters.
+     * Get all the users that voted on the poll.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return BelongsToMany<User, $this>
      */
-    public function voters()
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'voters')->withTimestamps();
+    }
+
+    /**
+     * Geth all the votes for the poll.
+     *
+     * @return HasMany<Voter, $this>
+     */
+    public function votes(): HasMany
     {
         return $this->hasMany(Voter::class);
     }
 
     /**
-     * Set The Poll's Title.
-     *
-     * @param $title
-     *
-     * @return string
+     * Set the poll's title.
      */
-    public function setTitleAttribute($title)
+    public function setTitleAttribute(string $title): void
     {
-        return $this->attributes['title'] = $title;
-    }
-
-    /**
-     * Create A Poll Title Slug.
-     *
-     * @param $title
-     *
-     * @return string
-     */
-    public function makeSlugFromTitle($title)
-    {
-        $slug = \strlen($title) > 20 ? \substr(Str::slug($title), 0, 20) : Str::slug($title);
-        $count = $this->where('slug', 'LIKE', '%'.$slug.'%')->count();
-
-        return $count ? \sprintf('%s-%s', $slug, $count) : $slug;
-    }
-
-    /**
-     * Get Total Votes On A Poll Option.
-     *
-     * @return string
-     */
-    public function totalVotes()
-    {
-        $result = 0;
-        foreach ($this->options as $option) {
-            $result += $option->votes;
-        }
-
-        return $result;
-    }
-
-    protected static function boot()
-    {
-        parent::boot();
-        self::creating(function ($poll) {
-            if (empty($poll->slug)) {
-                $poll->slug = $poll->makeSlugFromTitle($poll->title);
-            }
-
-            return true;
-        });
+        $this->attributes['title'] = $title;
     }
 }

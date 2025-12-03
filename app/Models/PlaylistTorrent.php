@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -15,7 +18,9 @@ namespace App\Models;
 
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\Pivot;
+use AllowDynamicProperties;
 
 /**
  * App\Models\PlaylistTorrent.
@@ -25,47 +30,47 @@ use Illuminate\Database\Eloquent\Model;
  * @property int      $playlist_id
  * @property int      $torrent_id
  * @property int      $tmdb_id
- * @property-read \App\Models\Playlist $playlist
- * @property-read \App\Models\Torrent $torrent
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\PlaylistTorrent newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\PlaylistTorrent newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\PlaylistTorrent query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\PlaylistTorrent whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\PlaylistTorrent wherePlaylistId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\PlaylistTorrent wherePosition($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\PlaylistTorrent whereTmdbId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\PlaylistTorrent whereTorrentId($value)
- * @mixin \Eloquent
  */
-class PlaylistTorrent extends Model
+#[AllowDynamicProperties]
+final class PlaylistTorrent extends Pivot
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\PlaylistTorrentFactory> */
+    use HasFactory;
+
     /**
-     * Indicates If The Model Should Be Timestamped.
+     * Indicates if the IDs are auto-incrementing.
      *
      * @var bool
      */
-    public $timestamps = false;
+    public $incrementing = true;
 
     /**
-     * Belongs To A Torrent.
+     * The attributes that aren't mass assignable.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @var string[]
      */
-    public function torrent()
+    protected $guarded = [];
+
+    protected $table = 'playlist_torrents';
+
+    /**
+     * Get the torrent associated with the playlist.
+     *
+     * @return BelongsTo<Torrent, $this>
+     */
+    public function torrent(): BelongsTo
     {
         return $this->belongsTo(Torrent::class);
     }
 
     /**
-     * Belongs To A Playlist.
+     * Get the playlist associated with the torrent.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Playlist, $this>
      */
-    public function playlist()
+    public function playlist(): BelongsTo
     {
         return $this->belongsTo(Playlist::class);
     }

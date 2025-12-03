@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,6 +19,8 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use AllowDynamicProperties;
 
 /**
  * App\Models\ChatStatus.
@@ -26,31 +31,28 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null                     $icon
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\User[] $users
- * @property-read int|null $users_count
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ChatStatus newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ChatStatus newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ChatStatus query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ChatStatus whereColor($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ChatStatus whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ChatStatus whereIcon($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ChatStatus whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ChatStatus whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ChatStatus whereUpdatedAt($value)
- * @mixin \Eloquent
  */
-class ChatStatus extends Model
+#[AllowDynamicProperties]
+final class ChatStatus extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\ChatStatusFactory> */
+    use HasFactory;
+
     /**
-     * A Status Has Many Users.
+     * The attributes that aren't mass assignable.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @var string[]
      */
-    public function users()
+    protected $guarded = ['id', 'created_at', 'updated_at'];
+
+    /**
+     * Get the users that have this chat status.
+     *
+     * @return HasMany<User, $this>
+     */
+    public function users(): HasMany
     {
         return $this->hasMany(User::class, 'chat_status_id', 'id');
     }

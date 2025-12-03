@@ -1,87 +1,122 @@
-@extends('layout.default')
+@extends('layout.with-main-and-sidebar')
 
 @section('title')
-    <title>@lang('common.upload') @lang('common.subtitle') - {{ config('other.title') }}</title>
+    <title>
+        {{ __('common.upload') }} {{ __('common.subtitle') }} - {{ config('other.title') }}
+    </title>
 @endsection
 
-@section('breadcrumb')
-    <li>
-        <a href="{{ route('subtitles.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('torrent.torrents')</span>
+@section('breadcrumbs')
+    <li class="breadcrumbV2">
+        <a href="{{ route('subtitles.index') }}" class="breadcrumb__link">
+            {{ __('common.subtitles') }}
         </a>
     </li>
-    <li>
-        <a href="{{ route('subtitles.create', ['torrent_id' => $torrent->id]) }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('common.upload') @lang('common.subtitle')</span>
-        </a>
+    <li class="breadcrumb--active">
+        {{ __('common.new-adj') }}
     </li>
 @endsection
 
-@section('content')
-    <div class="container">
-        <h2 class="upload-title">
-            @lang('common.upload') @lang('common.subtitle') - {{ $torrent->name }}
-        </h2>
-        <div class="well">
-            <h2 class="text-center">@lang('subtitle.rules-title')</h2>
-            @lang('subtitle.rules')
-        </div>
-        <div class="block">
-            <form method="POST" action="{{ route('subtitles.store') }}" id="form_upload_subtitle" class="form-horizontal" enctype="multipart/form-data">
+@section('page', 'page__subtitle--create')
+
+@section('main')
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ __('common.upload') }} {{ __('common.subtitle') }}</h2>
+        <div class="panel__body">
+            <form
+                id="form_upload_subtitle"
+                class="form"
+                action="{{ route('subtitles.store') }}"
+                enctype="multipart/form-data"
+                method="POST"
+            >
                 @csrf
-                <input name="torrent_id" type="hidden" value="{{ $torrent->id }}">
-                <input name="torrent_name" type="hidden" value="{{ $torrent->name }}">
-                <div class="form-group">
-                    <label for="torrent_id" class="col-sm-2 control-label">@lang('torrent.torrent')</label>
-                    <div class="col-sm-9">
-                        <p class="form-control-static">
-                            <a href="{{ route('torrent', ['id' => $torrent->id]) }}" title="{{ $torrent->name }}">{{ $torrent->name }}</a>
-                        </p>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="subtitle_file" class="col-sm-2 control-label">@lang('subtitle.subtitle-file')</label>
-                    <div class="col-sm-9">
-                        <input class="form-control" name="subtitle_file" accept=".srt,.ass,.sup,.zip" type="file" id="subtitle_file">
-                        <span class="help-block">@lang('subtitle.subtitle-file-types')</span>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="language_id" class="col-sm-2 control-label">@lang('common.language')</label>
-                    <div class="col-sm-9">
-                        <select class="form-control" id="language_id" name="language_id">
-                            @foreach ($media_languages as $media_language)
-                                <option value="{{ $media_language->id }}">{{ $media_language->name }} ({{ $media_language->code }})</option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="description" class="col-sm-2 control-label">@lang('subtitle.note')</label>
-                    <div class="col-sm-9">
-                        <input class="form-control" name="note" type="text" id="note">
-                        <span class="help-block">@lang('subtitle.note-help')</span>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="anonymous" class="col-sm-2 control-label">@lang('common.anonymous')?</label>
-                    <div class="col-sm-9">
-                        <div class="radio-inline">
-                            <input type="radio" name="anonymous" value="1">@lang('common.yes')
-                        </div>
-                        <div class="radio-inline">
-                            <input type="radio" name="anonymous" checked="checked" value="0">@lang('common.no')
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <div class="col-sm-9 col-sm-offset-2">
-                        <input class="btn btn-primary" type="submit" value="@lang('common.upload')">
-                    </div>
-                </div>
+                <input name="torrent_id" type="hidden" value="{{ $torrent->id }}" />
+                <p class="form__group">
+                    <label for="subtitle_file" class="form__label">
+                        {{ __('subtitle.subtitle-file') }}
+                        ({{ __('subtitle.subtitle-file-types') }})
+                    </label>
+                    <input
+                        id="subtitle_file"
+                        class="form__file"
+                        accept=".srt,.ass,.sup,.zip"
+                        name="subtitle_file"
+                        required
+                        type="file"
+                    />
+                </p>
+                <p class="form__group">
+                    <select id="language_id" class="form__select" name="language_id" required>
+                        <option hidden disabled selected value=""></option>
+                        @foreach ($media_languages as $media_language)
+                            <option
+                                value="{{ $media_language->id }}"
+                                @selected(old('media_language') == $media_language->id)
+                            >
+                                {{ $media_language->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <label class="form__label form__label--floating" for="language_id">
+                        {{ __('common.language') }}
+                    </label>
+                </p>
+                <p class="form__group">
+                    <input
+                        type="text"
+                        name="note"
+                        id="note"
+                        class="form__text"
+                        placeholder=" "
+                        required
+                    />
+                    <label class="form__label form__label--floating" for="note">
+                        {{ __('subtitle.note') }} ({{ __('subtitle.note-help') }})
+                    </label>
+                </p>
+                <p class="form__group">
+                    <input type="hidden" name="anon" value="0" />
+                    <input
+                        id="anon"
+                        class="form__checkbox"
+                        name="anon"
+                        type="checkbox"
+                        value="1"
+                        @checked(old('anon'))
+                    />
+                    <label class="form__label" for="anon">{{ __('common.anonymous') }}?</label>
+                </p>
+                <p class="form__group">
+                    <button class="form__button form__button--filled">
+                        {{ __('common.upload') }}
+                    </button>
+                </p>
             </form>
         </div>
-    </div>
+    </section>
+@endsection
+
+@section('sidebar')
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ __('torrent.torrent') }}</h2>
+        <div class="panel__body">
+            <a
+                href="{{ route('torrents.show', ['id' => $torrent->id]) }}"
+                title="{{ $torrent->name }}"
+            >
+                {{ $torrent->name }}
+            </a>
+        </div>
+    </section>
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ __('subtitle.rules-title') }}</h2>
+        <div class="panel__body">
+            <ol>
+                @foreach (Str::of(__('subtitle.rules'))->replace(['<ul>', '</ul>', '<li>', '</li>'], '')->trim()->explode("\n") as $rule)
+                    <li>{{ $rule }}</li>
+                @endforeach
+            </ol>
+        </div>
+    </section>
 @endsection

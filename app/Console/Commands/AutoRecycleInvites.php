@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,12 +17,10 @@
 namespace App\Console\Commands;
 
 use App\Models\Invite;
-use Carbon\Carbon;
+use Exception;
 use Illuminate\Console\Command;
+use Throwable;
 
-/**
- * @see \Tests\Unit\Console\Commands\AutoRecycleInvitesTest
- */
 class AutoRecycleInvites extends Command
 {
     /**
@@ -34,21 +35,21 @@ class AutoRecycleInvites extends Command
      *
      * @var string
      */
-    protected $description = 'Recycle Invites That Are Expired.';
+    protected $description = 'Recycle invites that are expired.';
 
     /**
      * Execute the console command.
      *
-     * @return mixed
+     * @throws Exception|Throwable If there is an error during the execution of the command.
      */
-    public function handle()
+    final public function handle(): void
     {
-        $current = Carbon::now();
-        $invites = Invite::whereNull('accepted_by')->whereNull('accepted_at')->where('expires_on', '<', $current)->get();
+        Invite::query()
+            ->whereNull('accepted_by')
+            ->whereNull('accepted_at')
+            ->where('expires_on', '<', now())
+            ->delete();
 
-        foreach ($invites as $invite) {
-            $invite->delete();
-        }
-        $this->comment('Automated Purge Unaccepted Invites Command Complete');
+        $this->comment('Automated purge unaccepted invites command complete');
     }
 }

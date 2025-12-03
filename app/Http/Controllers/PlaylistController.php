@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,27 +16,30 @@
 
 namespace App\Http\Controllers;
 
-use App\Helpers\Bencode;
-use App\Models\Movie;
+use App\Http\Requests\StorePlaylistRequest;
+use App\Http\Requests\UpdatePlaylistRequest;
+use App\Models\TmdbMovie;
 use App\Models\Playlist;
-use App\Models\PlaylistTorrent;
-use App\Models\Torrent;
-use App\Models\Tv;
+use App\Models\PlaylistCategory;
+use App\Models\TmdbTv;
 use App\Repositories\ChatRepository;
+use App\Traits\TorrentMeta;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\File;
 use Intervention\Image\Facades\Image;
-use ZipArchive;
+use Exception;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @see \Tests\Todo\Feature\Http\Controllers\PlaylistControllerTest
  */
 class PlaylistController extends Controller
 {
+    use TorrentMeta;
+
     /**
      * PlaylistController Constructor.
      */
-    public function __construct(private ChatRepository $chatRepository)
+    public function __construct(private readonly ChatRepository $chatRepository)
     {
     }
 
@@ -42,9 +48,7 @@ class PlaylistController extends Controller
      */
     public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $playlists = Playlist::with('user')->withCount('torrents')->where('is_private', '=', 0)->orderBy('name', 'ASC')->paginate(24);
-
-        return \view('playlist.index', ['playlists' => $playlists]);
+        return view('playlist.index');
     }
 
     /**
@@ -52,269 +56,142 @@ class PlaylistController extends Controller
      */
     public function create(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        return \view('playlist.create');
+        return view('playlist.create', [
+            'playlistCategories' => PlaylistCategory::query()->orderBy('position')->get(),
+        ]);
     }
 
     /**
      * Store A New Playlist.
-     *
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function store(Request $request)
+    public function store(StorePlaylistRequest $request): \Illuminate\Http\RedirectResponse
     {
-        $user = \auth()->user();
+        if ($request->hasFile('cover_image')) {
+            abort_if(\is_array($request->file('cover_image')), 400);
 
-        $playlist = new Playlist();
-        $playlist->user_id = $user->id;
-        $playlist->name = $request->input('name');
-        $playlist->description = $request->input('description');
-        $playlist->cover_image = null;
+            abort_unless($request->file('cover_image')->getError() === UPLOAD_ERR_OK, 500);
 
-        if ($request->hasFile('cover_image') && $request->file('cover_image')->getError() === 0) {
             $image = $request->file('cover_image');
-            $filename = 'playlist-cover_'.\uniqid('', true).'.'.$image->getClientOriginalExtension();
-            $path = \public_path('/files/img/'.$filename);
+            $filename = 'playlist-cover_'.uniqid('', true).'.'.$image->getClientOriginalExtension();
+            $path = Storage::disk('playlist-images')->path($filename);
             Image::make($image->getRealPath())->fit(400, 225)->encode('png', 100)->save($path);
-            $playlist->cover_image = $filename;
         }
 
-        $playlist->position = $request->input('position');
-        $playlist->is_private = $request->input('is_private');
+        $playlist = Playlist::create([
+            'user_id'     => $request->user()->id,
+            'cover_image' => $filename ?? null
+        ] + $request->validated());
 
-        $v = \validator($playlist->toArray(), [
-            'user_id'     => 'required',
-            'name'        => 'required',
-            'description' => 'required',
-            'is_private'  => 'required',
-        ]);
-
-        if ($v->fails()) {
-            return \redirect()->route('playlists.create')
-                ->withInput()
-                ->withErrors($v->errors());
-        }
-        $playlist->save();
         // Announce To Shoutbox
-        $appurl = \config('app.url');
-        if ($playlist->is_private != 1) {
+        if (!$playlist->is_private) {
             $this->chatRepository->systemMessage(
-                \sprintf('User [url=%s/', $appurl).$user->username.'.'.$user->id.']'.$user->username.\sprintf('[/url] has created a new playlist [url=%s/playlists/', $appurl).$playlist->id.']'.$playlist->name.'[/url] check it out now! :slight_smile:'
+                \sprintf('User [url=%s/', config('app.url')).$request->user()->username.'.'.$request->user()->id.']'.$request->user()->username.\sprintf('[/url] has created a new playlist [url=%s/playlists/', config('app.url')).$playlist->id.']'.$playlist->name.'[/url] check it out now!'
             );
         }
 
-        return \redirect()->route('playlists.show', ['id' => $playlist->id])
-            ->withSuccess('Your Playlist Was Created Successfully!');
+        return to_route('playlists.show', ['playlist' => $playlist])
+            ->with('success', trans('playlist.published-success'));
     }
 
     /**
      * Show A Playlist.
-     *
-     * @param \App\Playlist $id
      */
-    public function show($id): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    public function show(Request $request, Playlist $playlist): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $playlist = Playlist::findOrFail($id);
+        abort_if($playlist->is_private && $playlist->user_id !== $request->user()->id && !$request->user()->group->is_modo, 403, trans('playlist.private-error'));
 
-        $random = PlaylistTorrent::where('playlist_id', '=', $playlist->id)->inRandomOrder()->first();
-        if (isset($random)) {
-            $torrent = Torrent::where('id', '=', $random->torrent_id)->firstOrFail();
-        }
+        $randomTorrent = $playlist->torrents()->inRandomOrder()->with('category')->first();
 
-        $meta = null;
-
-        if (isset($random, $torrent)) {
-            if ($torrent->category->tv_meta && ($torrent->tmdb || $torrent->tmdb != 0)) {
-                $meta = Tv::with('genres', 'networks', 'seasons')->where('id', '=', $torrent->tmdb)->first();
-            }
-            if ($torrent->category->movie_meta && ($torrent->tmdb || $torrent->tmdb != 0)) {
-                $meta = Movie::with('genres', 'cast', 'companies', 'collection')->where('id', '=', $torrent->tmdb)->first();
-            }
-        }
-
-        $torrents = PlaylistTorrent::with(['torrent:id,name,category_id,resolution_id,type_id,tmdb,seeders,leechers,times_completed,size,anon'])
-            ->where('playlist_id', '=', $playlist->id)
-            ->orderBy(function ($query) {
-                $query->select('name')
-                    ->from('torrents')
-                    ->whereColumn('id', 'playlist_torrents.torrent_id')
-                    ->latest()
-                    ->limit(1);
-            })
+        $torrents = $playlist->torrents()
+            ->select('*')
+            ->selectRaw(<<<'SQL'
+                CASE
+                    WHEN category_id IN (SELECT id from categories where movie_meta = TRUE) THEN 'movie'
+                    WHEN category_id IN (SELECT id from categories where tv_meta = TRUE) THEN 'tv'
+                    WHEN category_id IN (SELECT id from categories where game_meta = TRUE) THEN 'game'
+                    WHEN category_id IN (SELECT id from categories where music_meta = TRUE) THEN 'music'
+                    WHEN category_id IN (SELECT id from categories where no_meta = TRUE) THEN 'no'
+                END as meta
+            SQL)
+            ->when($request->has('search'), fn ($query) => $query->where('name', 'LIKE', '%'.str_replace(' ', '%', $request->search).'%'))
+            ->with(['category', 'resolution', 'type', 'user.group'])
+            ->orderBy('name')
             ->paginate(26);
 
-        return \view('playlist.show', ['playlist' => $playlist, 'meta' => $meta, 'torrents' => $torrents]);
+        // See app/Traits/TorrentMeta.php
+        $this->scopeMeta($torrents);
+
+        return view('playlist.show', [
+            'playlist' => $playlist->load(['user.group', 'suggestions' => ['user.group', 'torrent']]),
+            'meta'     => match (true) {
+                $randomTorrent?->category?->tv_meta    => TmdbTv::find($randomTorrent->tmdb_tv_id),
+                $randomTorrent?->category?->movie_meta => TmdbMovie::find($randomTorrent->tmdb_movie_id),
+                default                                => null,
+            },
+            'latestPlaylistTorrent' => $playlist->torrents()->orderByPivot('created_at', 'desc')->first(),
+            'torrents'              => $torrents,
+            'search'                => $request->search,
+        ]);
     }
 
     /**
      * Show Playlist Update Form.
-     *
-     * @param \App\Playlist $id
      */
-    public function edit($id): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    public function edit(Request $request, Playlist $playlist): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $user = \auth()->user();
-        $playlist = Playlist::findOrFail($id);
+        abort_unless($request->user()->id === $playlist->user_id || $request->user()->group->is_modo, 403);
 
-        \abort_unless($user->id == $playlist->user_id || $user->group->is_modo, 403);
-
-        return \view('playlist.edit', ['playlist' => $playlist]);
+        return view('playlist.edit', [
+            'playlist'           => $playlist,
+            'playlistCategories' => PlaylistCategory::query()->orderBy('position')->get(),
+        ]);
     }
 
     /**
      * Update A Playlist.
-     *
-     * @param \App\Playlist $id
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function update(Request $request, $id)
+    public function update(UpdatePlaylistRequest $request, Playlist $playlist): \Illuminate\Http\RedirectResponse
     {
-        $user = \auth()->user();
-        $playlist = Playlist::findOrFail($id);
+        abort_unless($request->user()->id == $playlist->user_id || $request->user()->group->is_modo, 403);
 
-        \abort_unless($user->id == $playlist->user_id || $user->group->is_modo, 403);
-
-        $playlist->name = $request->input('name');
-        $playlist->description = $request->input('description');
-        $playlist->cover_image = null;
-
-        if ($request->hasFile('cover_image') && $request->file('cover_image')->getError() === 0) {
+        if ($request->hasFile('cover_image')) {
             $image = $request->file('cover_image');
-            $filename = 'playlist-cover_'.\uniqid('', true).'.'.$image->getClientOriginalExtension();
-            $path = \public_path('/files/img/'.$filename);
+
+            abort_if(\is_array($image), 400);
+
+            abort_unless($image->getError() === UPLOAD_ERR_OK, 500);
+
+            $filename = 'playlist-cover_'.uniqid('', true).'.'.$image->getClientOriginalExtension();
+            $path = Storage::disk('playlist-images')->path($filename);
             Image::make($image->getRealPath())->fit(400, 225)->encode('png', 100)->save($path);
-            $playlist->cover_image = $filename;
+
+            if ($playlist->cover_image !== null) {
+                Storage::disk('playlist-images')->delete($playlist->cover_image);
+            }
+
+            $playlist->update(['cover_image' => $filename] + $request->validated());
+        } else {
+            $playlist->update($request->validated());
         }
 
-        $playlist->position = $request->input('position');
-        $playlist->is_private = $request->input('is_private');
-
-        $v = \validator($playlist->toArray(), [
-            'name'        => 'required',
-            'description' => 'required',
-            'is_private'  => 'required',
-        ]);
-
-        if ($v->fails()) {
-            return \redirect()->route('playlists.edit', ['id' => $playlist->id])
-                ->withInput()
-                ->withErrors($v->errors());
-        }
-        $playlist->save();
-
-        return \redirect()->route('playlists.show', ['id' => $playlist->id])
-            ->withSuccess('Your Playlist Has Successfully Been Updated!');
+        return to_route('playlists.show', ['playlist' => $playlist])
+            ->with('success', trans('playlist.update-success'));
     }
 
     /**
      * Delete A Playlist.
      *
-     * @param \App\Playlist $id
-     *
-     * @throws \Exception
-     *
-     * @return \Illuminate\Http\RedirectResponse
+     * @throws Exception
      */
-    public function destroy($id)
+    public function destroy(Request $request, Playlist $playlist): \Illuminate\Http\RedirectResponse
     {
-        $user = \auth()->user();
-        $playlist = Playlist::findOrFail($id);
+        abort_unless($request->user()->id == $playlist->user_id || $request->user()->group->is_modo, 403);
 
-        \abort_unless($user->id == $playlist->user_id || $user->group->is_modo, 403);
-
+        $playlist->torrents()->detach();
+        $playlist->comments()->delete();
         $playlist->delete();
 
-        return \redirect()->route('playlists.index')
-            ->withSuccess('Playlist Deleted!');
-    }
-
-    /**
-     * Download All Playlist Torrents.
-     *
-     * @param $id
-     */
-    public function downloadPlaylist($id): \Illuminate\Http\RedirectResponse|\Symfony\Component\HttpFoundation\BinaryFileResponse
-    {
-        //  Extend The Maximum Execution Time
-        \set_time_limit(300);
-
-        // Playlist
-        $playlist = Playlist::with('torrents')->findOrFail($id);
-
-        // Authorized User
-        $user = \auth()->user();
-
-        // Define Dir Folder
-        $path = \getcwd().'/files/tmp_zip/';
-
-        // Check Directory exists
-        if (! File::isDirectory($path)) {
-            File::makeDirectory($path, 0755, true, true);
-        }
-
-        // Zip File Name
-        $zipFileName = \sprintf('[%s]%s.zip', $user->username, $playlist->name);
-
-        // Create ZipArchive Obj
-        $zipArchive = new ZipArchive();
-
-        // Get Users History
-        $playlistTorrents = PlaylistTorrent::where('playlist_id', '=', $playlist->id)->get();
-
-        if ($zipArchive->open($path.'/'.$zipFileName, ZipArchive::CREATE) === true) {
-            $failCSV = '"Name","URL","ID"';
-            $failCount = 0;
-
-            foreach ($playlistTorrents as $playlistTorrent) {
-                // Get Torrent
-                $torrent = Torrent::withAnyStatus()->find($playlistTorrent->torrent_id);
-
-                // Define The Torrent Filename
-                $tmpFileName = \sprintf('%s.torrent', $torrent->slug);
-
-                // The Torrent File Exist?
-                if (! \file_exists(\getcwd().'/files/torrents/'.$torrent->file_name)) {
-                    $failCSV .= '"'.$torrent->name.'","'.\route('torrent', ['id' => $torrent->id]).'","'.$torrent->id.'"
-';
-                    $failCount++;
-                } else {
-                    // Delete The Last Torrent Tmp File If Exist
-                    if (\file_exists(\getcwd().'/files/tmp/'.$tmpFileName)) {
-                        \unlink(\getcwd().'/files/tmp/'.$tmpFileName);
-                    }
-
-                    // Get The Content Of The Torrent
-                    $dict = Bencode::bdecode(\file_get_contents(\getcwd().'/files/torrents/'.$torrent->file_name));
-                    // Set the announce key and add the user passkey
-                    $dict['announce'] = \route('announce', ['passkey' => $user->passkey]);
-                    // Remove Other announce url
-                    unset($dict['announce-list']);
-
-                    $fileToDownload = Bencode::bencode($dict);
-                    \file_put_contents(\getcwd().'/files/tmp/'.$tmpFileName, $fileToDownload);
-
-                    // Add Files To ZipArchive
-                    $zipArchive->addFile(\getcwd().'/files/tmp/'.$tmpFileName, $tmpFileName);
-                }
-            }
-
-            if ($failCount > 0) {
-                $CSVtmpName = \sprintf('%s.zip', $playlist->name).'-missingTorrentFiles.CSV';
-                \file_put_contents(\getcwd().'/files/tmp/'.$CSVtmpName, $failCSV);
-                $zipArchive->addFile(\getcwd().'/files/tmp/'.$CSVtmpName, 'missingTorrentFiles.CSV');
-            }
-
-            // Close ZipArchive
-            $zipArchive->close();
-
-            $zipFile = $path.'/'.$zipFileName;
-
-            if (\file_exists($zipFile)) {
-                return \response()->download($zipFile)->deleteFileAfterSend(true);
-            }
-        }
-
-        return \redirect()->back()->withErrors('Something Went Wrong!');
+        return to_route('playlists.index')
+            ->with('success', trans('playlist.deleted'));
     }
 }

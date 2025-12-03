@@ -1,6 +1,16 @@
-<div class="block pv-5">
-    <div class="btn-group text-center">
-        <a href="{{ route('groups') }}" class="btn btn-sm btn-primary"><i
-                class="{{ config('other.font-awesome') }} fa-users"></i> @lang('common.groups')</a>
-    </div>
-</div>
+<li class="{{ Route::is('groups') ? 'nav-tab--active' : 'nav-tabV2' }}">
+    <a
+        class="{{ Route::is('groups') ? 'nav-tab--active__link' : 'nav-tab__link' }}"
+        href="{{ route('groups') }}"
+    >
+        {{ __('common.groups') }}
+    </a>
+</li>
+<li class="{{ Route::is('groups_requirements') ? 'nav-tab--active' : 'nav-tabV2' }}">
+    <a
+        class="{{ Route::is('groups_requirements') ? 'nav-tab--active__link' : 'nav-tab__link' }}"
+        href="{{ route('groups_requirements') }}"
+    >
+        {{ __('common.groups') }} requirements
+    </a>
+</li>

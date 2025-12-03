@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -23,37 +26,51 @@ class NewUnfollow extends Notification implements ShouldQueue
     use Queueable;
 
     /**
-     * NewUnfolllow Constructor.
+     * NewUnfollow Constructor.
      */
-    public function __construct(public string $type, public User $sender, public User $target)
+    public function __construct(public string $type, public User $unfollower)
     {
     }
 
     /**
      * Get the notification's delivery channels.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<int, string>
      */
-    public function via($notifiable)
+    public function via(object $notifiable): array
     {
         return ['database'];
     }
 
     /**
+     * Determine if the notification should be sent.
+     */
+    public function shouldSend(User $notifiable): bool
+    {
+        if ($notifiable->notification?->block_notifications === 1) {
+            return false;
+        }
+
+        if ($notifiable->notification?->show_account_unfollow === 0) {
+            return false;
+        }
+
+        // If the sender's group ID is found in the "Block all notifications from the selected groups" array,
+        // the expression will return false.
+        return ! \in_array($this->unfollower->group_id, $notifiable->notification?->json_account_groups ?? [], true);
+    }
+
+    /**
      * Get the array representation of the notification.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<string, mixed>
      */
-    public function toArray($notifiable)
+    public function toArray(object $notifiable): array
     {
         return [
-            'title' => $this->sender->username.' Has Unfollowed You!',
-            'body'  => $this->sender->username.' has stopped following you so they will no longer get notifications about your activities.',
-            'url'   => '/users/'.$this->sender->username,
+            'title' => $this->unfollower->username.' Has Unfollowed You!',
+            'body'  => $this->unfollower->username.' has stopped following you so they will no longer get notifications about your activities.',
+            'url'   => '/users/'.$this->unfollower->username,
         ];
     }
 }

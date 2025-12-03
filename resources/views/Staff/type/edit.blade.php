@@ -1,53 +1,76 @@
-@extends('layout.default')
+@extends('layout.with-main')
 
-@section('breadcrumb')
-    <li>
-        <a href="{{ route('staff.dashboard.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('staff.staff-dashboard')</span>
+@section('breadcrumbs')
+    <li class="breadcrumbV2">
+        <a href="{{ route('staff.dashboard.index') }}" class="breadcrumb__link">
+            {{ __('staff.staff-dashboard') }}
         </a>
     </li>
-    <li>
-        <a href="{{ route('staff.types.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('staff.torrent-types')</span>
+    <li class="breadcrumbV2">
+        <a href="{{ route('staff.types.index') }}" class="breadcrumb__link">
+            {{ __('staff.torrent-types') }}
         </a>
     </li>
-    <li class="active">
-        <a href="{{ route('staff.types.edit', ['id' => $type->id]) }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">
-                @lang('common.edit')
-                @lang('torrent.torrent')
-                @lang('common.type')
-            </span>
-        </a>
+    <li class="breadcrumbV2">
+        {{ $type->name }}
+    </li>
+    <li class="breadcrumb--active">
+        {{ __('common.edit') }}
     </li>
 @endsection
 
-@section('content')
-    <div class="container box">
-        <h2>
-            @lang('common.edit')
-            @lang(trans_choice('common.a-an-art',false))
-            @lang('torrent.torrent')
-            @lang('common.type')
+@section('page', 'page__staff-type--edit')
+
+@section('main')
+    <section class="panelV2">
+        <h2 class="panel__heading">
+            {{ __('common.edit') }}
+            {{ __('torrent.torrent') }}
+            {{ __('common.type') }}:
+            {{ $type->name }}
         </h2>
-        <form role="form" method="POST" action="{{ route('staff.types.update', ['id' => $type->id]) }}">
-            @method('PATCH')
-            @csrf
-            <div class="form-group">
-                <label for="name">@lang('common.name')</label>
-                <label>
-                    <input type="text" class="form-control" name="name" value="{{ $type->name }}">
-                </label>
-            </div>
-    
-            <div class="form-group">
-                <label for="name">@lang('common.position')</label>
-                <label>
-                    <input type="text" class="form-control" name="position" value="{{ $type->position }}">
-                </label>
-            </div>
-    
-            <button type="submit" class="btn btn-default">@lang('common.submit')</button>
-        </form>
-    </div>
+        <div class="panel__body">
+            <form
+                class="form"
+                method="POST"
+                action="{{ route('staff.types.update', ['type' => $type]) }}"
+            >
+                @method('PATCH')
+                @csrf
+                <p class="form__group">
+                    <input
+                        id="name"
+                        class="form__text"
+                        name="name"
+                        required
+                        type="text"
+                        value="{{ $type->name }}"
+                    />
+                    <label class="form__label form__label--floating" for="name">
+                        {{ __('common.name') }}
+                    </label>
+                </p>
+                <p class="form__group">
+                    <input
+                        id="position"
+                        class="form__text"
+                        inputmode="numeric"
+                        name="position"
+                        pattern="[0-9]*"
+                        required
+                        type="text"
+                        value="{{ $type->position }}"
+                    />
+                    <label class="form__label form__label--floating" for="position">
+                        {{ __('common.position') }}
+                    </label>
+                </p>
+                <p class="form__group">
+                    <button class="form__button form__button--filled">
+                        {{ __('common.submit') }}
+                    </button>
+                </p>
+            </form>
+        </div>
+    </section>
 @endsection

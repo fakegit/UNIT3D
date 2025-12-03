@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,9 +16,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Comment;
+use App\Http\Requests\StoreTicketRequest;
 use App\Models\Ticket;
-use App\Models\TicketAttachment;
 use App\Models\TicketCategory;
 use App\Models\TicketPriority;
 use Illuminate\Http\Request;
@@ -25,189 +27,101 @@ class TicketController extends Controller
     /**
      * Display a listing of the resource.
      */
-    final public function index(Request $request): \Illuminate\Contracts\View\Factory|\Illuminate\View\View|\Illuminate\Contracts\Foundation\Application
+    final public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
     {
-        return \view('ticket.index');
+        return view('ticket.index');
     }
 
     /**
      * Show the form for creating a new resource.
      */
-    final public function create(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View|\Illuminate\Contracts\Foundation\Application
+    final public function create(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
     {
-        $categories = TicketCategory::all()->sortBy('position');
-        $priorities = TicketPriority::all()->sortBy('position');
-
-        return \view('ticket.create', [
-            'categories' => $categories,
-            'priorities' => $priorities,
+        return view('ticket.create', [
+            'categories' => TicketCategory::orderBy('position')->get(),
+            'priorities' => TicketPriority::orderBy('position')->get(),
         ]);
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    final public function store(Request $request): \Illuminate\Http\RedirectResponse
+    final public function store(StoreTicketRequest $request): \Illuminate\Http\RedirectResponse
     {
-        $user = $request->user();
+        $ticket = Ticket::create(['user_id' => $request->user()->id] + $request->validated());
 
-        $ticket = new Ticket();
-        $ticket->user_id = $user->id;
-        $ticket->category_id = $request->input('category');
-        $ticket->priority_id = $request->input('priority');
-        $ticket->subject = $request->input('subject');
-        $ticket->body = $request->input('body');
-
-        $v = \validator($ticket->toArray(), [
-            'user_id'     => 'required|exists:users,id',
-            'category_id' => 'required|exists:ticket_categories,id',
-            'priority_id' => 'required|exists:ticket_priorities,id',
-            'subject'     => 'required',
-            'body'        => 'required',
-        ]);
-
-        if ($v->fails()) {
-            return \redirect()->route('tickets.create')
-                ->withInput()
-                ->withErrors($v->errors());
+        if ($request->hasFile('attachments')) {
+            TicketAttachmentController::storeTicketAttachments($request, $ticket, $request->user());
         }
 
-        $ticket->save();
-
-        return \redirect()->route('tickets.show', ['id' => $ticket->id])
-            ->withSuccess('Your Helpdesk Ticket Was Created Successfully!');
+        return to_route('tickets.show', ['ticket' => $ticket])
+            ->with('success', trans('ticket.created-success'));
     }
 
     /**
      * Display the specified resource.
      */
-    final public function show(Request $request, int $id): \Illuminate\Contracts\View\Factory|\Illuminate\View\View|\Illuminate\Contracts\Foundation\Application
+    final public function show(Request $request, Ticket $ticket): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
     {
-        $user = $request->user();
-        $ticket = Ticket::with(['comments'])->findOrFail($id);
-        \abort_unless($user->group->is_modo || $user->id == $ticket->user_id, 403);
+        abort_unless($request->user()->group->is_modo || $request->user()->id === $ticket->user_id, 403);
 
-        if ($user->id == $ticket->user_id) {
-            $ticket->user_read = 1;
-            $ticket->save();
-        }
-        if ($user->id == $ticket->staff_id) {
-            $ticket->staff_read = 1;
-            $ticket->save();
+        if ($request->user()->id === $ticket->user_id) {
+            $ticket->user_read = true;
         }
 
-        return \view('ticket.show', [
-            'user'   => $user,
-            'ticket' => $ticket,
-        ]);
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    final public function edit(int $id): \Illuminate\Http\Response
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    final public function update(Request $request, int $id): \Illuminate\Http\RedirectResponse
-    {
-        $ticket = Ticket::findOrFail($id);
-        $user = $request->user();
-        \abort_unless($user->group->is_modo || $user->id == $ticket->user_id, 403);
-
-        $ticket->category_id = $request->input('category');
-        $ticket->priority_id = $request->input('priority');
-        $ticket->subject = $request->input('subject');
-        $ticket->body = $request->input('body');
-
-        $v = \validator($ticket->toArray(), [
-            'user_id'     => 'required|exists:users,id',
-            'category_id' => 'required|exists:ticket_categories,id',
-            'priority_id' => 'required|exists:ticket_priorities,id',
-            'subject'     => 'required',
-            'body'        => 'required',
-        ]);
-
-        if ($v->fails()) {
-            return \redirect()->route('tickets.create')
-                ->withInput()
-                ->withErrors($v->errors());
+        if ($request->user()->id === $ticket->staff_id) {
+            $ticket->staff_read = true;
         }
 
         $ticket->save();
 
-        return \redirect()->route('tickets.show', ['id' => $ticket->id])
-            ->withSuccess('Your Helpdesk Ticket Was Updated Successfully!');
+        return view('ticket.show', [
+            'user'            => $request->user(),
+            'ticket'          => $ticket->load('comments', 'notes'),
+            'pastUserTickets' => Ticket::query()
+                ->where('user_id', '=', $ticket->user_id)
+                ->where('id', '!=', $ticket->id)
+                ->get(),
+        ]);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    final public function destroy(Request $request, int $id): \Illuminate\Http\RedirectResponse
+    final public function destroy(Request $request, Ticket $ticket): \Illuminate\Http\RedirectResponse
     {
-        $ticket = Ticket::findOrFail($id);
-        $user = $request->user();
-        \abort_unless($user->group->is_modo || $user->id == $ticket->user_id, 403);
+        abort_unless($request->user()->group->is_modo, 403);
 
-        Comment::where('ticket_id', '=', $id)->delete();
-        TicketAttachment::where('ticket_id', '=', $id)->delete();
+        $ticket->notes()->delete();
+        $ticket->comments()->delete();
+        $ticket->attachments()->delete();
         $ticket->delete();
 
-        return \redirect()->route('tickets.index')
-            ->withSuccess('Your Helpdesk Ticket Was Deleted Successfully!');
+        return to_route('tickets.index')
+            ->with('success', trans('ticket.deleted-success'));
     }
 
-    final public function assign(Request $request, int $id): \Illuminate\Http\RedirectResponse
+    final public function close(Request $request, Ticket $ticket): \Illuminate\Http\RedirectResponse
     {
-        $ticket = Ticket::findOrFail($id);
-        $user = $request->user();
-        \abort_unless($user->group->is_modo, 403);
+        abort_unless($request->user()->group->is_modo || $request->user()->id === $ticket->user_id, 403);
 
-        $ticket->staff_id = $request->input('user_id');
-        $ticket->staff_read = 0;
-
-        $v = \validator($ticket->toArray(), [
-            'user_id' => 'required|exists:users,id',
+        $ticket->update([
+            'closed_at' => now(),
         ]);
 
-        if ($v->fails()) {
-            return \redirect()->route('tickets.show', ['id' => $ticket->id])
-                ->withErrors($v->errors());
-        }
-
-        $ticket->save();
-
-        return \redirect()->route('tickets.show', ['id' => $ticket->id])
-            ->withSuccess('Helpdesk Ticket Was Assigned Successfully!');
+        return to_route('tickets.index')
+            ->with('success', trans('ticket.closed-success'));
     }
 
-    final public function unassign(Request $request, int $id): \Illuminate\Http\RedirectResponse
+    final public function reopen(Request $request, Ticket $ticket): \Illuminate\Http\RedirectResponse
     {
-        $ticket = Ticket::findOrFail($id);
-        $user = $request->user();
-        \abort_unless($user->group->is_modo, 403);
+        abort_unless($request->user()->group->is_modo || $request->user()->id === $ticket->user_id, 403);
 
-        $ticket->staff_id = null;
-        $ticket->save();
+        $ticket->update([
+            'closed_at' => null,
+        ]);
 
-        return \redirect()->route('tickets.show', ['id' => $ticket->id])
-            ->withSuccess('Helpdesk Ticket Was Unassigned Successfully!');
-    }
-
-    final public function close(Request $request, int $id): \Illuminate\Http\RedirectResponse
-    {
-        $ticket = Ticket::findOrFail($id);
-        $user = $request->user();
-        \abort_unless($user->group->is_modo || $user->id == $ticket->user_id, 403);
-
-        $ticket->closed_at = \now();
-        $ticket->save();
-
-        return \redirect()->route('tickets.show', ['id' => $ticket->id])
-            ->withSuccess('Helpdesk Ticket Was Closed Successfully!');
+        return to_route('tickets.show', ['ticket' => $ticket])
+            ->with('success', trans('ticket.reopened-success'));
     }
 }

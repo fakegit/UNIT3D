@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,6 +16,7 @@
 
 namespace App\Notifications;
 
+use App\Models\Post;
 use App\Models\Topic;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
@@ -26,42 +30,60 @@ class NewTopic extends Notification implements ShouldQueue
     /**
      * NewTopic Constructor.
      */
-    public function __construct(public string $type, public User $user, public Topic $topic)
+    public function __construct(public string $type, public User $user, public Topic $topic, public ?Post $firstPost = null)
     {
     }
 
     /**
      * Get the notification's delivery channels.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<int, string>
      */
-    public function via($notifiable)
+    public function via(object $notifiable): array
     {
         return ['database'];
     }
 
     /**
+     * Determine if the notification should be sent.
+     */
+    public function shouldSend(User $notifiable): bool
+    {
+        if ($notifiable->notification?->block_notifications === 1) {
+            return false;
+        }
+
+        if ($notifiable->notification?->show_subscription_forum === 0) {
+            return false;
+        }
+
+        // If the sender's group ID is found in the "Block all notifications from the selected groups" array,
+        // the expression will return false.
+        return ! \in_array($this->user->group_id, $notifiable->notification?->json_subscription_groups ?? [], true);
+    }
+
+    /**
      * Get the array representation of the notification.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<string, mixed>
      */
-    public function toArray($notifiable)
+    public function toArray(User $notifiable): array
     {
+        $username = ($this->firstPost?->anon && !$notifiable->group->is_modo && !$notifiable->is($this->user))
+            ? 'Anonymous'
+            : $this->user->username;
+
         if ($this->type == 'staff') {
             return [
-                'title' => $this->user->username.' Has Posted In A Staff Forum',
-                'body'  => $this->user->username.' has started a new staff topic in '.$this->topic->forum->name,
-                'url'   => \route('forum_topic', ['id' => $this->topic->id]),
+                'title' => $username.' Has Posted In A Staff Forum',
+                'body'  => $username.' has started a new staff topic in '.$this->topic->forum->name,
+                'url'   => route('topics.show', ['id' => $this->topic->id]),
             ];
         }
 
         return [
-            'title' => $this->user->username.' Has Posted In A Subscribed Forum',
-            'body'  => $this->user->username.' has started a new topic in '.$this->topic->forum->name,
+            'title' => $username.' Has Posted In A Subscribed Forum',
+            'body'  => $username.' has started a new topic in '.$this->topic->forum->name,
             'url'   => \sprintf('/forums/topics/%s', $this->topic->id),
         ];
     }

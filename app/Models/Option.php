@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,6 +19,8 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Option.
@@ -26,38 +31,30 @@ use Illuminate\Database\Eloquent\Model;
  * @property int                             $votes
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\Poll $poll
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Option newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Option newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Option query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Option whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Option whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Option whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Option wherePollId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Option whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Option whereVotes($value)
- * @mixin \Eloquent
  */
-class Option extends Model
+#[AllowDynamicProperties]
+final class Option extends Model
 {
-    use HasFactory;
     use Auditable;
 
-    /** The Attributes That Are Mass Assignable.
+    /** @use HasFactory<\Database\Factories\OptionFactory> */
+    use HasFactory;
+
+    /**
+     * The attributes that are mass assignable.
      *
-     * @var array
+     * @var list<string>
      */
     protected $fillable = [
         'name',
     ];
 
     /**
-     * Belongs To A Poll.
+     * Get the poll that owns the option.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Poll, $this>
      */
-    public function poll()
+    public function poll(): BelongsTo
     {
         return $this->belongsTo(Poll::class);
     }

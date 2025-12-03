@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,11 +16,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\VoteOnPoll;
-use App\Models\Option;
 use App\Models\Poll;
 use App\Models\Voter;
-use App\Repositories\ChatRepository;
 use Illuminate\Http\Request;
 
 /**
@@ -26,94 +26,30 @@ use Illuminate\Http\Request;
 class PollController extends Controller
 {
     /**
-     * PollController Constructor.
-     */
-    public function __construct(private ChatRepository $chatRepository)
-    {
-    }
-
-    /**
      * Show All Polls.
      */
     public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $polls = Poll::latest()->paginate(15);
-
-        return \view('poll.latest', ['polls' => $polls]);
+        return view('poll.latest', [
+            'polls' => Poll::latest()->paginate(15),
+        ]);
     }
 
     /**
      * Show A Poll.
-     *
-     * @param \App\Models\Poll $id
      */
-    public function show(Request $request, $id): \Illuminate\Contracts\View\Factory|\Illuminate\View\View|\Illuminate\Http\RedirectResponse
+    public function show(Request $request, Poll $poll): \Illuminate\Contracts\View\Factory|\Illuminate\View\View|\Illuminate\Http\RedirectResponse
     {
-        $poll = Poll::findOrFail($id);
-        $user = $request->user();
-        $userHasVoted = $poll->voters->where('user_id', '=', $user->id)->isNotEmpty();
-
-        if ($userHasVoted) {
-            return \redirect()->route('poll_results', ['id' => $poll->id])
-                ->withInfo('You have already vote on this poll. Here are the results.');
+        if (Voter::whereBelongsTo($poll)->whereBelongsTo($request->user())->exists()) {
+            return to_route('polls.votes.index', ['poll' => $poll])
+                ->withInfo(trans('poll.already-voted-result'));
         }
 
-        return \view('poll.show', ['poll' => $poll]);
-    }
-
-    /**
-     * Vote On A Poll.
-     *
-     *
-     * @return \Illuminate\Http\RedirectResponse
-     */
-    public function vote(VoteOnPoll $voteOnPoll)
-    {
-        $user = $voteOnPoll->user();
-        $poll = Option::findOrFail($voteOnPoll->input('option.0'))->poll;
-        $voted = Voter::where('user_id', '=', $user->id)
-            ->where('poll_id', '=', $poll->id)
-            ->exists();
-        if ($voted) {
-            return \redirect()->route('poll_results', ['id' => $poll->id])
-                ->withErrors('Bro have already vote on this poll. Your vote has not been counted.');
+        if ($poll->expires_at?->isPast()) {
+            return to_route('polls.votes.index', ['poll' => $poll])
+                ->withInfo(trans('poll.expired-voted-result'));
         }
 
-        // Operate options after validation
-        foreach ($voteOnPoll->input('option') as $option) {
-            Option::findOrFail($option)->increment('votes');
-        }
-
-        // Make voter after option operation completed
-        $voter = new Voter();
-        $voter->poll_id = $poll->id;
-        $voter->user_id = $user->id;
-        $voter->save();
-
-        $pollUrl = \href_poll($poll);
-        $profileUrl = \href_profile($user);
-
-        $this->chatRepository->systemMessage(
-            \sprintf('[url=%s]%s[/url] has voted on poll [url=%s]%s[/url]', $profileUrl, $user->username, $pollUrl, $poll->title)
-        );
-
-        return \redirect()->route('poll_results', ['id' => $poll->id])
-            ->withSuccess('Your vote has been counted.');
-    }
-
-    /**
-     * Show A Polls Results.
-     *
-     * @param \App\Models\Poll $id
-     */
-    public function result($id): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
-    {
-        $poll = Poll::findOrFail($id);
-        $map = [
-            'poll'        => $poll,
-            'total_votes' => $poll->totalVotes(),
-        ];
-
-        return \view('poll.result', $map);
+        return view('poll.show', ['poll' => $poll]);
     }
 }

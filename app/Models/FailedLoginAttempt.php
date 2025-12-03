@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -15,6 +18,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\FailedLoginAttempt.
@@ -25,26 +30,17 @@ use Illuminate\Database\Eloquent\Model;
  * @property string                          $ip_address
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FailedLoginAttempt newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FailedLoginAttempt newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FailedLoginAttempt query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FailedLoginAttempt whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FailedLoginAttempt whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FailedLoginAttempt whereIpAddress($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FailedLoginAttempt whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FailedLoginAttempt whereUserId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FailedLoginAttempt whereUsername($value)
- * @mixin \Eloquent
  */
-class FailedLoginAttempt extends Model
+#[AllowDynamicProperties]
+final class FailedLoginAttempt extends Model
 {
+    /** @use HasFactory<\Database\Factories\FailedLoginAttemptFactory> */
     use HasFactory;
 
     /**
-     * The Attributes That Are Mass Assignable.
+     * The attributes that are mass assignable.
      *
-     * @var array
+     * @var list<string>
      */
     protected $fillable = [
         'user_id',
@@ -53,18 +49,12 @@ class FailedLoginAttempt extends Model
     ];
 
     /**
-     * @param $user
-     * @param $username
-     * @param $ip
+     * Get the user that was failed to be logged into.
      *
-     * @return mixed
+     * @return BelongsTo<User, $this>
      */
-    public static function record($user, $username, $ip)
+    public function user(): BelongsTo
     {
-        return static::create([
-            'user_id'    => \is_null($user) ? null : $user->id,
-            'username'   => $username,
-            'ip_address' => $ip,
-        ]);
+        return $this->belongsTo(User::class);
     }
 }

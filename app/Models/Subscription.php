@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,8 +17,11 @@
 namespace App\Models;
 
 use App\Traits\Auditable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Subscription.
@@ -26,56 +32,67 @@ use Illuminate\Database\Eloquent\Model;
  * @property int|null                        $topic_id
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\Forum|null $forum
- * @property-read \App\Models\Topic|null $topic
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subscription newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subscription newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subscription query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subscription whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subscription whereForumId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subscription whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subscription whereTopicId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subscription whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subscription whereUserId($value)
- * @mixin \Eloquent
  */
-class Subscription extends Model
+#[AllowDynamicProperties]
+final class Subscription extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\SubscriptionFactory> */
+    use HasFactory;
+
     /**
-     * Belongs To A User.
+     * Get the user that owns the subscription.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A Topic.
+     * Gets the subscribed topic.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Topic, $this>
      */
-    public function topic()
+    public function topic(): BelongsTo
     {
         return $this->belongsTo(Topic::class);
     }
 
     /**
-     * Belongs To A Forum.
+     * Gets the subscribed forum.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Forum, $this>
      */
-    public function forum()
+    public function forum(): BelongsTo
     {
         return $this->belongsTo(Forum::class);
+    }
+
+    /**
+     * Scope query to only include subscriptions of a forum.
+     *
+     * @param  Builder<Subscription> $query
+     * @return Builder<Subscription>
+     */
+    public function scopeOfForum(Builder $query, int $forum_id): Builder
+    {
+        return $query->where('forum_id', '=', $forum_id);
+    }
+
+    /**
+     * Scope query to only include subscriptions of a topic.
+     *
+     * @param  Builder<Subscription> $query
+     * @return Builder<Subscription>
+     */
+    public function scopeOfTopic($query, int $topic_id): Builder
+    {
+        return $query->where('topic_id', '=', $topic_id);
     }
 }

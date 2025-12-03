@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,7 +16,14 @@
 
 namespace App\Notifications;
 
+use App\Models\Article;
+use App\Models\TmdbCollection;
 use App\Models\Comment;
+use App\Models\Playlist;
+use App\Models\Ticket;
+use App\Models\Torrent;
+use App\Models\TorrentRequest;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -25,51 +35,116 @@ class NewCommentTag extends Notification implements ShouldQueue
     /**
      * NewCommentTag Constructor.
      */
-    public function __construct(public string $type, public string $tagger, public Comment $comment)
+    public function __construct(public Torrent|TorrentRequest|Ticket|Playlist|TmdbCollection|Article $model, public Comment $comment)
     {
     }
 
     /**
      * Get the notification's delivery channels.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<int, string>
      */
-    public function via($notifiable)
+    public function via(object $notifiable): array
     {
         return ['database'];
     }
 
     /**
+     * Determine if the notification should be sent.
+     */
+    public function shouldSend(User $notifiable): bool
+    {
+        // Do not notify self
+        if ($this->comment->user_id === $notifiable->id) {
+            return false;
+        }
+
+        // Enforce non-anonymous staff notifications to be sent
+        if ($this->comment->user->group->is_modo &&
+            ! $this->comment->anon) {
+            return true;
+        }
+
+        // Evaluate general settings
+        if ($notifiable->notification?->block_notifications === 1) {
+            return false;
+        }
+
+        // Evaluate model based settings
+        switch ($this->model::class) {
+            case Torrent::class:
+                if ($notifiable->notification?->show_mention_torrent_comment === 0) {
+                    return false;
+                }
+
+                // If the sender's group ID is found in the "Block all notifications from the selected groups" array,
+                // the expression will return false.
+                return ! \in_array($this->comment->user->group_id, $notifiable->notification?->json_mention_groups ?? [], true);
+            case TorrentRequest::class:
+                if ($notifiable->notification?->show_mention_request_comment === 0) {
+                    return false;
+                }
+
+                // If the sender's group ID is found in the "Block all notifications from the selected groups" array,
+                // the expression will return false.
+                return ! \in_array($this->comment->user->group_id, $notifiable->notification?->json_mention_groups ?? [], true);
+            case Ticket::class:
+                return ! ($this->model->staff_id === $this->comment->id);
+            case Playlist::class:
+            case Article::class:
+                if ($notifiable->notification?->show_mention_article_comment === 0) {
+                    return false;
+                }
+
+                // If the sender's group ID is found in the "Block all notifications from the selected groups" array,
+                // the expression will return false.
+                return ! \in_array($this->comment->user->group_id, $notifiable->notification?->json_mention_groups ?? [], true);
+        }
+
+        return true;
+    }
+
+    /**
      * Get the array representation of the notification.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<string, mixed>
      */
-    public function toArray($notifiable)
+    public function toArray(object $notifiable): array
     {
-        if ($this->type == 'torrent') {
-            return [
-                'title' => $this->tagger.' Has Tagged You In A Torrent Comment',
-                'body'  => $this->tagger.' has tagged you in a Comment for Torrent '.$this->comment->torrent->name,
-                'url'   => \sprintf('/torrents/%s', $this->comment->torrent->id),
-            ];
-        }
+        $username = $this->comment->anon ? 'Anonymous' : $this->comment->user->username;
+        $title = $this->comment->anon ? 'You Have Been Tagged' : $username.' Has Tagged You';
 
-        if ($this->type == 'request') {
-            return [
-                'title' => $this->tagger.' Has Tagged You In A Request Comment',
-                'body'  => $this->tagger.' has tagged you in a Comment for Request '.$this->comment->request->name,
-                'url'   => \sprintf('/requests/%s', $this->comment->request->id),
-            ];
-        }
-
-        return [
-            'title' => $this->tagger.' Has Tagged You In An Article Comment',
-            'body'  => $this->tagger.' has tagged you in a Comment for Article '.$this->comment->article->title,
-            'url'   => \sprintf('/articles/%s', $this->comment->article->id),
-        ];
+        return match ($this->model::class) {
+            Torrent::class => [
+                'title' => $title,
+                'body'  => $username.' has tagged you in an comment on Torrent '.$this->model->name,
+                'url'   => '/torrents/'.$this->model->id,
+            ],
+            TorrentRequest::class => [
+                'title' => $title,
+                'body'  => $username.' has tagged you in an comment on Torrent Request '.$this->model->name,
+                'url'   => '/requests/'.$this->model->id,
+            ],
+            Ticket::class => [
+                'title' => $title,
+                'body'  => $username.' has tagged you in an comment on Ticket '.$this->model->subject,
+                'url'   => '/tickets/'.$this->model->id,
+            ],
+            Playlist::class => [
+                'title' => $title,
+                'body'  => $username.' has tagged you in an comment on Playlist '.$this->model->name,
+                'url'   => '/playlists/'.$this->model->id,
+            ],
+            TmdbCollection::class => [
+                'title' => $title,
+                'body'  => $username.' has tagged you in an comment on Collection '.$this->model->name,
+                'url'   => '/mediahub/collections/'.$this->model->id,
+            ],
+            Article::class => [
+                'title' => $title,
+                'body'  => $username.' has tagged you in an comment on Article '.$this->model->title,
+                'url'   => '/articles/'.$this->model->id,
+            ],
+        };
     }
 }

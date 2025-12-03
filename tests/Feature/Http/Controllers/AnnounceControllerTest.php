@@ -1,58 +1,56 @@
 <?php
 
-namespace Tests\Feature\Http\Controllers;
-
-use App\Helpers\Bencode;
-use App\Models\Torrent;
-use App\Models\User;
-use Database\Seeders\GroupsTableSeeder;
-use Tests\TestCase;
+declare(strict_types=1);
 
 /**
- * @see \App\Http\Controllers\AnnounceController
+ * NOTICE OF LICENSE.
+ *
+ * UNIT3D Community Edition is open-sourced software licensed under the GNU Affero General Public License v3.0
+ * The details is bundled with this project in the file LICENSE.txt.
+ *
+ * @project    UNIT3D Community Edition
+ *
+ * @author     HDVinnie <hdinnovations@protonmail.com>
+ * @license    https://www.gnu.org/licenses/agpl-3.0.en.html/ GNU Affero General Public License v3.0
  */
-class AnnounceControllerTest extends TestCase
-{
-    /**
-     * @test
-     */
-    public function announce_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
 
-        $user = User::factory()->create([
-            'can_download' => true,
-        ]);
+use App\Enums\ModerationStatus;
+use App\Models\Torrent;
+use App\Models\User;
+use Illuminate\Support\Facades\Redis;
 
-        $info_hash = '16679042096019090177'; // 20 bytes
-        $peer_id = '19045931013802080695'; // 20 bytes
+test('index returns an ok response', function (): void {
+    Redis::connection('announce')->flushdb();
+    $user = User::factory()->create([
+        'can_download' => true,
+    ]);
 
-        Torrent::factory()->create([
-            'info_hash' => \bin2hex($info_hash),
-            'status'    => 1, // Approved
-        ]);
+    $info_hash = '16679042096019090177'; // 20 bytes
+    $peer_id = '19045931013802080695'; // 20 bytes
 
-        $headers = [
-            'accept-language' => null,
-            'referer'         => null,
-            'accept-charset'  => null,
-            'want-digest'     => null,
-        ];
+    Torrent::factory()->create([
+        'info_hash' => $info_hash,
+        'status'    => ModerationStatus::APPROVED,
+    ]);
 
-        $response = $this->withHeaders($headers)->get(route('announce', [
-            'passkey'    => $user->passkey,
-            'info_hash'  => $info_hash,
-            'peer_id'    => $peer_id,
-            'port'       => 7022,
-            'left'       => 0,
-            'uploaded'   => 1,
-            'downloaded' => 1,
-            'compact'    => 1,
-        ]))
-            ->assertOk();
+    $headers = [
+        'accept-language' => null,
+        'referer'         => null,
+        'accept-charset'  => null,
+        'want-digest'     => null,
+    ];
 
-        $decoded = Bencode::bdecode($response->getContent());
+    $response = $this->withHeaders($headers)->get(route('announce', [
+        'passkey'    => $user->passkey,
+        'info_hash'  => $info_hash,
+        'peer_id'    => $peer_id,
+        'port'       => 7022,
+        'left'       => 0,
+        'uploaded'   => 1,
+        'downloaded' => 1,
+        'compact'    => 1,
+    ]));
+    $response ->assertOk();
 
-        $this->assertArrayNotHasKey('failure reason', $decoded);
-    }
-}
+    $this->assertStringNotContainsString('failure reason', $response->getContent());
+});

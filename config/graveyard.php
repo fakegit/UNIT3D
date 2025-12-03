@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * NOTICE OF LICENSE.
  *
@@ -12,7 +14,6 @@
  */
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Enabled
@@ -29,7 +30,7 @@ return [
     | Seedtime
     |--------------------------------------------------------------------------
     |
-    | Time In Seconds Needed For Successful Ressurection (Default: 2592000seconds / 30days)
+    | Time In Seconds Needed For Successful Resurrection (Default: 2592000seconds / 30days)
     |
     */
 
@@ -45,5 +46,4 @@ return [
     */
 
     'reward' => '5',
-
 ];

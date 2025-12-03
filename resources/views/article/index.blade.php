@@ -1,57 +1,57 @@
-@extends('layout.default')
+@extends('layout.with-main')
 
 @section('title')
-    <title>@lang('articles.articles') - {{ config('other.title') }}</title>
+    <title>{{ __('articles.articles') }} - {{ config('other.title') }}</title>
 @endsection
 
 @section('meta')
-    <meta name="description" content="@lang('articles.meta-articles')">
+    <meta name="description" content="{{ __('articles.meta-articles') }}" />
 @endsection
 
-@section('breadcrumb')
-    <li>
-        <a href="{{ route('articles.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('articles.articles')</span>
-        </a>
+@section('breadcrumbs')
+    <li class="breadcrumb--active">
+        {{ __('articles.articles') }}
     </li>
 @endsection
 
-@section('content')
-    <div class="container box">
-        <div class="header gradient light_blue">
-            <div class="inner_content">
-                <h1>@lang('articles.articles')</h1>
-            </div>
-        </div>
-        @foreach ($articles as $article)
-            <div class="well">
-                <a href="{{ route('articles.show', ['id' => $article->id]) }}" style=" float: right; margin-right: 10px;">
-                    @if ( ! is_null($article->image))
-                        <img src="{{ url('files/img/' . $article->image) }}" alt="{{ $article->title }}">
-                    @else
-                        <img src="{{ url('img/missing-image.png') }}" alt="{{ $article->title }}">
-                    @endif
-                </a>
-        
-                <h1 class="text-bold" style="display: inline ;">{{ $article->title }}</h1>
-        
-                <p class="text-muted">
-                    <em>@lang('articles.published-at') {{ $article->created_at->toDayDateTimeString() }}</em>
-                </p>
-        
-                <p style="margin-top: 20px;">
-                    @joypixels(preg_replace('#\[[^\]]+\]#', '', Str::limit($article->content), 150))...
-                </p>
-        
-                <div class="text-center">
-                    <a href="{{ route('articles.show', ['id' => $article->id]) }}" class="btn btn-success">
-                        @lang('articles.read-more')
+@section('page', 'page__article--index')
+
+@section('main')
+    @foreach ($articles as $article)
+        <article class="article-preview">
+            <header class="article-preview__header">
+                <h2 class="article-preview__title">
+                    <a
+                        class="article-preview__link"
+                        href="{{ route('articles.show', ['article' => $article]) }}"
+                    >
+                        {{ $article->title }}
                     </a>
-                </div>
-            </div>
-        @endforeach
-        <div class="text-center">
-            {{ $articles->links() }}
-        </div>
-    </div>
+                </h2>
+                <time
+                    class="article-preview__published-date"
+                    datetime="{{ $article->created_at }}"
+                    title="{{ $article->created_at }}"
+                >
+                    {{ $article->created_at->diffForHumans() }}
+                </time>
+                <img
+                    class="article-preview__image"
+                    src="{{ route('authenticated_images.article_image', ['article' => $article]) }}"
+                    alt=""
+                />
+            </header>
+            <p class="article-preview__content">
+                @joypixels(preg_replace('#\[[^\]]+\]#', '', Str::limit(e($article->content), 500, '...'), 150))
+            </p>
+            <a
+                href="{{ route('articles.show', ['article' => $article]) }}"
+                class="article-preview__read-more"
+            >
+                {{ __('articles.read-more') }}
+            </a>
+        </article>
+    @endforeach
+
+    {{ $articles->links('partials.pagination') }}
 @endsection

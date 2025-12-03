@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,6 +16,7 @@
 
 namespace App\Jobs;
 
+use App\Http\Middleware\RateLimitOutboundMail;
 use App\Mail\DeleteUser;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
@@ -21,6 +25,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Mail;
+use DateTime;
 
 class SendDeleteUserMail implements ShouldQueue
 {
@@ -31,10 +36,8 @@ class SendDeleteUserMail implements ShouldQueue
 
     /**
      * The number of times the job may be attempted.
-     *
-     * @var int
      */
-    public $tries = 3;
+    public int $tries = 3;
 
     /**
      * SendDeleteUserMail Constructor.
@@ -44,16 +47,28 @@ class SendDeleteUserMail implements ShouldQueue
     }
 
     /**
-     * Execute the job.
+     * Get the middleware the job should pass through.
      *
-     * @return void
+     * @return array<int, object>
      */
-    public function handle()
+    public function middleware(): array
     {
-        if ($this->attempts() > 2) {
-            $this->delay(\min(30 * $this->attempts(), 300));
-        }
+        return [new RateLimitOutboundMail()];
+    }
 
-        Mail::to($this->user)->send(new DeleteUser($this->user));
+    /**
+     * Execute the job.
+     */
+    public function handle(): void
+    {
+        Mail::to($this->user)->send(new DeleteUser($this->user->email));
+    }
+
+    /**
+     * Determine the time at which the job should timeout.
+     */
+    public function retryUntil(): DateTime
+    {
+        return now()->addHours(2);
     }
 }

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -11,8 +14,9 @@
  * @license    https://www.gnu.org/licenses/agpl-3.0.en.html/ GNU Affero General Public License v3.0
  */
 
-return [
+use App\Enums\UserGroup;
 
+return [
     /*
     |--------------------------------------------------------------------------
     | User Pruning
@@ -26,5 +30,5 @@ return [
     'account_age'  => 90,
     'last_login'   => 90,
     'soft_delete'  => 120,
-    'group_ids'    => [3, 11, 12, 15],
+    'group_ids'    => [UserGroup::USER->value, UserGroup::POWERUSER->value, UserGroup::SUPERUSER->value, UserGroup::LEECH->value],
 ];

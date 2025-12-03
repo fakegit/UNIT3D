@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,13 +17,15 @@
 namespace App\Console\Commands;
 
 use App\Models\PersonalFreeleech;
-use App\Models\PrivateMessage;
-use Carbon\Carbon;
+use App\Models\User;
+use App\Notifications\PersonalFreeleechDeleted;
+use App\Services\Unit3dAnnounce;
+use Exception;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Notification;
+use Throwable;
 
-/**
- * @see \Tests\Unit\Console\Commands\AutoRemovePersonalFreeleechTest
- */
 class AutoRemovePersonalFreeleech extends Command
 {
     /**
@@ -35,30 +40,28 @@ class AutoRemovePersonalFreeleech extends Command
      *
      * @var string
      */
-    protected $description = 'Automatically Removes A Users Personal Freeleech If It Has Expired';
+    protected $description = 'Automatically removes a users personal freeleech if it has expired';
 
     /**
      * Execute the console command.
      *
-     * @return mixed
+     * @throws Exception|Throwable If there is an error during the execution of the command.
      */
-    public function handle()
+    final public function handle(): void
     {
         $current = Carbon::now();
-        $personalFreeleech = PersonalFreeleech::where('created_at', '<', $current->copy()->subDays(1)->toDateTimeString())->get();
+        $personalFreeleech = PersonalFreeleech::where('created_at', '<', $current->copy()->subDays(1))->get();
 
         foreach ($personalFreeleech as $pfl) {
-            // Send Private Message
-            $pm = new PrivateMessage();
-            $pm->sender_id = 1;
-            $pm->receiver_id = $pfl->user_id;
-            $pm->subject = 'Personal 24 Hour Freeleech Expired';
-            $pm->message = 'Your [b]Personal 24 Hour Freeleech[/b] has expired! Feel free to reenable it in the BON Store! [color=red][b]THIS IS AN AUTOMATED SYSTEM MESSAGE, PLEASE DO NOT REPLY![/b][/color]';
-            $pm->save();
+            Notification::send(new User(['id' => $pfl->user_id]), new PersonalFreeleechDeleted());
 
             // Delete The Record From DB
             $pfl->delete();
+
+            cache()->put('personal_freeleech:'.$pfl->user_id, false);
+            Unit3dAnnounce::removePersonalFreeleech($pfl->user_id);
         }
-        $this->comment('Automated Removal User Personal Freeleech Command Complete');
+
+        $this->comment('Automated removal user personal freeleech command complete');
     }
 }

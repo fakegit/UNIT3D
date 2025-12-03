@@ -1,44 +1,33 @@
-@extends('layout.default')
+@extends('layout.with-main')
 
 @section('title')
-    <title>@lang('common.user') @lang('common.search') - @lang('staff.staff-dashboard') - {{ config('other.title') }}</title>
+    <title>
+        {{ __('common.user') }} {{ __('common.search') }} - {{ __('staff.staff-dashboard') }} -
+        {{ config('other.title') }}
+    </title>
 @endsection
 
 @section('meta')
-    <meta name="description" content="User Search - @lang('staff.staff-dashboard')">
+    <meta name="description" content="User search - {{ __('staff.staff-dashboard') }}" />
 @endsection
 
-@section('breadcrumb')
-    <li>
-        <a href="{{ route('staff.dashboard.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('staff.staff-dashboard')</span>
+@section('nav-tabs')
+    @include('Staff.partials.user-info-search')
+@endsection
+
+@section('breadcrumbs')
+    <li class="breadcrumbV2">
+        <a href="{{ route('staff.dashboard.index') }}" class="breadcrumb__link">
+            {{ __('staff.staff-dashboard') }}
         </a>
     </li>
-    <li>
-        <a href="{{ route('user_search') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('common.user') @lang('common.search')</span>
-        </a>
+    <li class="breadcrumb--active">
+        {{ __('common.users') }}
     </li>
 @endsection
 
-@section('content')
-    <style>
-        td {
-            vertical-align: middle !important;
-        }
-    </style>
-    <div class="container">
-        <div class="block">
-            <div class="header gradient silver">
-                <div class="inner_content">
-                    <div class="page-title">
-                        <h1 style="margin: 0;">@lang('common.users')</h1>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="box container">
-        @livewire('user-search')
-    </div>
+@section('page', 'page__staff-user--index')
+
+@section('main')
+    @livewire('user-search')
 @endsection

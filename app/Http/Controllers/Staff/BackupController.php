@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,7 +16,6 @@
 
 namespace App\Http\Controllers\Staff;
 
-use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 
 /**
@@ -24,11 +26,8 @@ class BackupController extends Controller
     /**
      * Display All Backups.
      */
-    public function index(Request $request): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $user = $request->user();
-        \abort_unless($user->group->is_owner, 403);
-
-        return \view('Staff.backup.index');
+        return view('Staff.backup.index');
     }
 }

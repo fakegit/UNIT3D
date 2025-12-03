@@ -1,21 +1,55 @@
-@extends('layout.default')
+@extends('layout.with-main')
 
-@section('content')
-    <div class="container-fluid">
-        @include('blocks.news')
-    
-        @if (!auth()->user()->chat_hidden)
-            <div id="vue">
+@section('page', 'page__home')
+
+@section('main')
+    @foreach ($blocks as $block)
+        @switch($block)
+            @case('news')
+                @include('blocks.news')
+
+                @break
+            @case('chat')
                 @include('blocks.chat')
-            </div>
-        @endif
-    
-        @include('blocks.featured')
-        @include('blocks.poll')
-        @include('blocks.top_torrents')
-        @include('blocks.top_uploaders')
-        @include('blocks.latest_topics')
-        @include('blocks.latest_posts')
-        @include('blocks.online')
-    </div>
+                @vite('resources/js/unit3d/chat.js')
+
+                @break
+            @case('featured')
+                @include('blocks.featured')
+
+                @break
+            @case('random_media')
+                @livewire('random-media')
+
+                @break
+            @case('poll')
+                @include('blocks.poll')
+
+                @break
+            @case('top_torrents')
+                @livewire('top-torrents')
+
+                @break
+            @case('top_users')
+                @livewire('top-users')
+
+                @break
+            @case('latest_topics')
+                @include('blocks.latest-topics')
+
+                @break
+            @case('latest_posts')
+                @include('blocks.latest-posts')
+
+                @break
+            @case('latest_comments')
+                @include('blocks.latest-comments')
+
+                @break
+            @case('online')
+                @include('blocks.online')
+
+                @break
+        @endswitch
+    @endforeach
 @endsection

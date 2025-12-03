@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,9 +17,10 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Staff\UpdateChatBotRequest;
 use App\Models\Bot;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use Exception;
 
 /**
  * @see \Tests\Feature\Http\Controllers\Staff\ChatBotControllerTest
@@ -25,153 +29,74 @@ class ChatBotController extends Controller
 {
     /**
      * Display a listing of the Bots resource.
-     *
-     * @param null $hash
      */
-    public function index($hash = null): \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
     {
-        $bots = Bot::orderBy('position', 'ASC')->get();
-
-        return \view('Staff.chat.bot.index', [
-            'bots' => $bots,
+        return view('Staff.chat.bot.index', [
+            'bots' => Bot::oldest('position')->get(),
         ]);
     }
 
     /**
      * Show the form for editing the specified Bot resource.
-     *
-     * @param int $id
      */
-    public function edit(Request $request, $id): \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    public function edit(Request $request, Bot $bot): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
     {
-        $user = $request->user();
-        $bot = Bot::findOrFail($id);
-
-        return \view('Staff.chat.bot.edit', [
-            'user'           => $user,
-            'bot'            => $bot,
+        return view('Staff.chat.bot.edit', [
+            'user' => $request->user(),
+            'bot'  => $bot,
         ]);
     }
 
     /**
      * Update the specified Bot resource in storage.
-     *
-     * @param int $id
-     *
-     * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function update(UpdateChatBotRequest $request, Bot $bot): \Illuminate\Http\RedirectResponse
     {
-        $user = $request->user();
-        $bot = Bot::findOrFail($id);
+        $bot->update($request->validated());
 
-        if ($request->has('command') && $request->input('command') == $bot->command) {
-            $v = \validator($request->all(), [
-                'name'     => 'required|min:3|max:255',
-                'command'  => 'required|alpha_dash|min:3|max:255',
-                'position' => 'required',
-                'color'    => 'required',
-                'icon'     => 'required',
-                'emoji'    => 'required',
-                'help'     => 'sometimes|max:9999',
-                'info'     => 'sometimes|max:9999',
-                'about'    => 'sometimes|max:9999',
-            ]);
-        } else {
-            $v = \validator($request->all(), [
-                'name'     => 'required|min:3|max:255',
-                'command'  => 'required|alpha_dash|min:3|max:255|unique:bots',
-                'position' => 'required',
-                'color'    => 'required',
-                'icon'     => 'required',
-                'emoji'    => 'required',
-                'help'     => 'sometimes|max:9999',
-                'info'     => 'sometimes|max:9999',
-                'about'    => 'sometimes|max:9999',
-            ]);
-        }
-
-        $error = null;
-        $success = null;
-        $redirect = null;
-
-        if ($v->passes()) {
-            $bot->name = $request->input('name');
-            $bot->slug = Str::slug($request->input('name'));
-            $bot->position = $request->input('position');
-            $bot->color = $request->input('color');
-            $bot->icon = $request->input('icon');
-            $bot->emoji = $request->input('emoji');
-            $bot->about = $request->input('about');
-            $bot->info = $request->input('info');
-            $bot->help = $request->input('help');
-            $bot->command = $request->input('command');
-            $bot->save();
-            $success = 'The Bot Has Been Updated';
-        }
-        if ($success === null) {
-            $error = 'Unable To Process Request';
-            if ($v->errors()) {
-                $error = $v->errors();
-            }
-
-            return \redirect()->route('staff.bots.edit', ['id' => $id])
-                ->withErrors($error);
-        }
-
-        return \redirect()->route('staff.bots.edit', ['id' => $id])
-            ->withSuccess($success);
+        return to_route('staff.bots.index')
+            ->with('success', "The bot has been updated");
     }
 
     /**
      * Remove the specified Bot resource from storage.
      *
-     * @param int $id
-     *
-     * @throws \Exception
-     *
-     * @return \Illuminate\Http\Response
+     * @throws Exception
      */
-    public function destroy($id)
+    public function destroy(Bot $bot): \Illuminate\Http\RedirectResponse
     {
-        $bot = Bot::where('is_protected', '=', 0)->findOrFail($id);
+        abort_if($bot->is_protected, 403);
+
         $bot->delete();
 
-        return \redirect()->route('staff.bots.index')
-            ->withSuccess('The Humans Vs Machines War Has Begun! Humans: 1 and Bots: 0');
+        return to_route('staff.bots.index')
+            ->with('success', 'The Humans Vs Machines War has begun! Humans: 1 and Bots: 0');
     }
 
     /**
      * Disable the specified Bot resource in storage.
-     *
-     * @param int $id
-     *
-     * @return \Illuminate\Http\Response
      */
-    public function disable($id)
+    public function disable(Bot $bot): \Illuminate\Http\RedirectResponse
     {
-        $bot = Bot::findOrFail($id);
-        $bot->active = 0;
-        $bot->save();
+        $bot->update([
+            'active' => false,
+        ]);
 
-        return \redirect()->route('staff.bots.index')
-            ->withSuccess('The Bot Has Been Disabled');
+        return to_route('staff.bots.index')
+            ->with('success', 'The bot has been disabled');
     }
 
     /**
      * Enable the specified Bot resource in storage.
-     *
-     * @param int $id
-     *
-     * @return \Illuminate\Http\Response
      */
-    public function enable($id)
+    public function enable(Bot $bot): \Illuminate\Http\RedirectResponse
     {
-        $bot = Bot::findOrFail($id);
-        $bot->active = 1;
-        $bot->save();
+        $bot->update([
+            'active' => true,
+        ]);
 
-        return \redirect()->route('staff.bots.index')
-            ->withSuccess('The Bot Has Been Enabled');
+        return to_route('staff.bots.index')
+            ->with('success', 'The bot has been enabled');
     }
 }

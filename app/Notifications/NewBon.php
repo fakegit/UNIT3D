@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,7 +16,8 @@
 
 namespace App\Notifications;
 
-use App\Models\BonTransactions;
+use App\Models\Gift;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -25,35 +29,56 @@ class NewBon extends Notification implements ShouldQueue
     /**
      * NewBon Constructor.
      */
-    public function __construct(public string $type, public string $sender, public BonTransactions $bonTransactions)
+    public function __construct(public Gift $gift)
     {
     }
 
     /**
      * Get the notification's delivery channels.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<int, string>
      */
-    public function via($notifiable)
+    public function via(object $notifiable): array
     {
         return ['database'];
     }
 
     /**
+     * Determine if the notification should be sent.
+     */
+    public function shouldSend(User $notifiable): bool
+    {
+        // Enforce non-anonymous staff notifications to be sent
+        if ($this->gift->sender->group->is_modo) {
+            return true;
+        }
+
+        if ($notifiable->notification?->block_notifications === 1) {
+            return false;
+        }
+
+        if ($notifiable->notification?->show_bon_gift === 0) {
+            return false;
+        }
+
+        // If the sender's group ID is found in the "Block all notifications from the selected groups" array,
+        // the expression will return false.
+        return ! \in_array($this->gift->sender->group_id, $notifiable->notification?->json_bon_groups ?? [], true);
+    }
+
+    /**
      * Get the array representation of the notification.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<string, mixed>
      */
-    public function toArray($notifiable)
+    public function toArray(object $notifiable): array
     {
+        $this->gift->load('sender');
+
         return [
-            'title' => $this->sender.' Has Gifted You '.$this->bonTransactions->cost.' BON',
-            'body'  => $this->sender.' has gifted you '.$this->bonTransactions->cost.' BON with the following note: '.$this->bonTransactions->comment,
-            'url'   => \sprintf('/users/%s', $this->bonTransactions->senderObj->username),
+            'title' => $this->gift->sender->username.' Has Gifted You '.$this->gift->bon.' BON',
+            'body'  => $this->gift->sender->username.' has gifted you '.$this->gift->bon.' BON with the following note: '.$this->gift->message,
+            'url'   => \sprintf('/users/%s', $this->gift->sender->username),
         ];
     }
 }

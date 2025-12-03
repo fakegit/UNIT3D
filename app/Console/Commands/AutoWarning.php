@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,14 +17,16 @@
 namespace App\Console\Commands;
 
 use App\Models\History;
-use App\Models\PrivateMessage;
+use App\Models\User;
 use App\Models\Warning;
-use Carbon\Carbon;
+use App\Notifications\UserWarning;
+use App\Services\Unit3dAnnounce;
+use Illuminate\Support\Carbon;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+use Exception;
+use Throwable;
 
-/**
- * @see \Tests\Unit\Console\Commands\AutoWarningTest
- */
 class AutoWarning extends Command
 {
     /**
@@ -36,65 +41,84 @@ class AutoWarning extends Command
      *
      * @var string
      */
-    protected $description = 'Automatically Post Warnings To Users Accounts and Warnings Table';
+    protected $description = 'Automatically post warnings to users accounts and warnings table';
 
     /**
      * Execute the console command.
      *
-     * @throws \Exception
-     *
-     * @return mixed
+     * @throws Exception|Throwable If there is an error during the execution of the command.
      */
-    public function handle()
+    final public function handle(): void
     {
-        if (\config('hitrun.enabled') == true) {
-            $carbon = new Carbon();
-            $hitrun = History::with(['user', 'torrent'])
-                ->where('actual_downloaded', '>', 0)
-                ->where('prewarn', '=', 1)
-                ->where('hitrun', '=', 0)
-                ->where('immune', '=', 0)
-                ->where('active', '=', 0)
-                ->where('seedtime', '<', \config('hitrun.seedtime'))
-                ->where('updated_at', '<', $carbon->copy()->subDays(\config('hitrun.grace'))->toDateTimeString())
-                ->get();
-
-            foreach ($hitrun as $hr) {
-                if (! $hr->user->group->is_immune && $hr->actual_downloaded > ($hr->torrent->size * (\config('hitrun.buffer') / 100))) {
-                    $exsist = Warning::withTrashed()
-                        ->where('torrent', '=', $hr->torrent->id)
-                        ->where('user_id', '=', $hr->user->id)
-                        ->first();
-                    // Insert Warning Into Warnings Table if doesnt already exsist
-                    if ($exsist === null) {
-                        $warning = new Warning();
-                        $warning->user_id = $hr->user->id;
-                        $warning->warned_by = '1';
-                        $warning->torrent = $hr->torrent->id;
-                        $warning->reason = \sprintf('Hit and Run Warning For Torrent %s', $hr->torrent->name);
-                        $warning->expires_on = $carbon->copy()->addDays(\config('hitrun.expire'));
-                        $warning->active = '1';
-                        $warning->save();
-
-                        // Add +1 To Users Warnings Count In Users Table
-                        $hr->hitrun = 1;
-                        $hr->user->hitandruns++;
-                        $hr->user->save();
-
-                        // Send Private Message
-                        $pm = new PrivateMessage();
-                        $pm->sender_id = 1;
-                        $pm->receiver_id = $hr->user->id;
-                        $pm->subject = 'Hit and Run Warning Received';
-                        $pm->message = 'You have received a automated [b]WARNING[/b] from the system because [b]you failed to follow the Hit and Run rules in relation to Torrent '.$hr->torrent->name.'[/b]
-                            [color=red][b]THIS IS AN AUTOMATED SYSTEM MESSAGE, PLEASE DO NOT REPLY![/b][/color]';
-                        $pm->save();
-
-                        $hr->save();
-                    }
-                }
-            }
+        if (config('hitrun.enabled') !== true) {
+            return;
         }
-        $this->comment('Automated User Warning Command Complete');
+
+        $carbon = new Carbon();
+        $hitrun = History::with(['user', 'torrent'])
+            ->where('actual_downloaded', '>', 0)
+            ->where('prewarned_at', '<=', now()->subDays(config('hitrun.prewarn')))
+            ->where('hitrun', '=', 0)
+            ->where('immune', '=', 0)
+            ->where('active', '=', 0)
+            ->where('seedtime', '<', config('hitrun.seedtime'))
+            ->where('updated_at', '<', $carbon->copy()->subDays(config('hitrun.grace')))
+            ->whereRelation('user.group', 'is_immune', '=', false)
+            ->whereRelation('user', 'is_donor', '=', false)
+            ->whereHas('torrent', fn ($query) => $query->whereRaw('history.actual_downloaded > torrents.size * ?', [config('hitrun.buffer') / 100]))
+            ->whereDoesntHave('user.warnings', fn ($query) => $query->withTrashed()->whereColumn('warnings.torrent_id', '=', 'history.torrent_id'))
+            ->get();
+
+        $usersWithWarnings = [];
+
+        foreach ($hitrun as $hr) {
+            Warning::create([
+                'user_id'    => $hr->user->id,
+                'warned_by'  => User::SYSTEM_USER_ID,
+                'torrent_id' => $hr->torrent->id,
+                'reason'     => \sprintf('Hit and Run Warning For Torrent %s', $hr->torrent->name),
+                'expires_on' => $carbon->copy()->addDays(config('hitrun.expire')),
+                'active'     => true,
+            ]);
+
+            History::query()
+                ->where('torrent_id', '=', $hr->torrent_id)
+                ->where('user_id', '=', $hr->user_id)
+                ->update([
+                    'hitrun'     => true,
+                    'updated_at' => DB::raw('updated_at'),
+                ]);
+
+            // Add +1 To Users Warnings Count In Users Table
+            $hr->user->increment('hitandruns');
+
+            // Add user to usersWithWarnings array
+            $usersWithWarnings[$hr->user->id] = $hr->user;
+        }
+
+        // Send a single notification for each user with warnings
+        foreach ($usersWithWarnings as $user) {
+            $user->notify(new UserWarning($user));
+        }
+
+        // Calculate User Warning Count and Disable DL Priv If Required.
+        Warning::query()
+            ->with('user')
+            ->select(DB::raw('user_id, count(*) as value'))
+            ->where('active', '=', 1)
+            ->groupBy('user_id')
+            ->having('value', '>=', config('hitrun.max_warnings'))
+            ->whereRelation('user', 'can_download', '=', true)
+            ->chunkById(100, function ($warnings): void {
+                foreach ($warnings as $warning) {
+                    $warning->user->update(['can_download' => 0]);
+
+                    cache()->forget('user:'.$warning->user->passkey);
+
+                    Unit3dAnnounce::addUser($warning->user);
+                }
+            }, 'user_id');
+
+        $this->comment('Automated user warning command complete');
     }
 }

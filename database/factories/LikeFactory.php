@@ -1,36 +1,44 @@
 <?php
 
-/* @var \Illuminate\Database\Eloquent\Factory $factory */
+declare(strict_types=1);
+
+/**
+ * NOTICE OF LICENSE.
+ *
+ * UNIT3D Community Edition is open-sourced software licensed under the GNU Affero General Public License v3.0
+ * The details is bundled with this project in the file LICENSE.txt.
+ *
+ * @project    UNIT3D Community Edition
+ *
+ * @author     HDVinnie <hdinnovations@protonmail.com>
+ * @license    https://www.gnu.org/licenses/agpl-3.0.en.html/ GNU Affero General Public License v3.0
+ */
 
 namespace Database\Factories;
 
-use App\Models\Like;
 use App\Models\Post;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use App\Models\Like;
 
+/** @extends Factory<Like> */
 class LikeFactory extends Factory
 {
     /**
      * The name of the factory's corresponding model.
-     *
-     * @var string
      */
     protected $model = Like::class;
 
     /**
      * Define the model's default state.
-     *
-     * @return array
      */
-    public function definition()
+    public function definition(): array
     {
         return [
-            'user_id'     => fn () => User::factory()->create()->id,
-            'post_id'     => fn () => Post::factory()->create()->id,
-            'subtitle_id' => $this->faker->randomNumber(),
-            'like'        => $this->faker->boolean,
-            'dislike'     => $this->faker->boolean,
+            'user_id' => User::factory(),
+            'post_id' => Post::factory(),
+            'like'    => $this->faker->boolean(),
+            'dislike' => $this->faker->boolean(),
         ];
     }
 }

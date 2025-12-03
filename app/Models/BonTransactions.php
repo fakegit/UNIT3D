@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,101 +16,98 @@
 
 namespace App\Models;
 
-use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\BonTransactions.
  *
  * @property int      $id
- * @property int      $itemID
+ * @property int      $bon_exchange_id
  * @property string   $name
- * @property float    $cost
- * @property int      $sender
- * @property int      $receiver
+ * @property string   $cost
+ * @property int|null $sender_id
+ * @property int|null $receiver_id
  * @property int|null $torrent_id
  * @property int|null $post_id
  * @property string   $comment
- * @property string   $date_actioned
- * @property-read \App\Models\BonExchange $exchange
- * @property-read \App\Models\User $receiverObj
- * @property-read \App\Models\User $senderObj
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonTransactions newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonTransactions newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonTransactions query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonTransactions whereComment($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonTransactions whereCost($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonTransactions whereDateActioned($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonTransactions whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonTransactions whereItemID($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonTransactions whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonTransactions wherePostId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonTransactions whereReceiver($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonTransactions whereSender($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonTransactions whereTorrentId($value)
- * @mixin \Eloquent
+ * @property string   $created_at
  */
-class BonTransactions extends Model
+#[AllowDynamicProperties]
+final class BonTransactions extends Model
 {
+    /** @use HasFactory<\Database\Factories\BonTransactionsFactory> */
     use HasFactory;
-    use Auditable;
 
     /**
-     * Indicates If The Model Should Be Timestamped.
+     * Indicates if the model should be timestamped.
      *
      * @var bool
      */
     public $timestamps = false;
 
     /**
-     * The Storage Format Of The Model's Date Columns.
+     * The storage format of the model's date columns.
      *
      * @var string
      */
     protected $dateFormat = 'U';
 
     /**
-     * Belongs To A Sender.
+     * The attributes that aren't mass assignable.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @var string[]
      */
+    protected $guarded = ['id', 'created_at', 'updated_at'];
 
-    // Bad name to not conflict with sender (not sender_id)
-
-    public function senderObj()
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array{cost: 'decimal:2'}
+     */
+    protected function casts(): array
     {
-        return $this->belongsTo(User::class, 'sender', 'id')->withDefault([
+        return [
+            'cost' => 'decimal:2',
+        ];
+    }
+
+    /**
+     * Get the user that sent the bon.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function sender(): BelongsTo
+    {
+        return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A Receiver.
+     * Get the user that received the bon.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-
-    // Bad name to not conflict with sender (not sender_id)
-
-    public function receiverObj()
+    public function receiver(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'receiver', 'id')->withDefault([
+        return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To BonExchange.
+     * Get the exchange that was transacted.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<BonExchange, $this>
      */
-    public function exchange()
+    public function exchange(): BelongsTo
     {
-        return $this->belongsTo(BonExchange::class, 'itemID', 'id')->withDefault([
+        return $this->belongsTo(BonExchange::class)->withDefault([
             'value' => 0,
             'cost'  => 0,
         ]);

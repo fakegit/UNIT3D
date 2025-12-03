@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,69 +16,68 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Language;
-use Carbon\Carbon;
+use App\Helpers\Language;
 use Closure;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\App;
+use Date;
 
 class SetLanguage
 {
     /**
      * This function checks if language to set is an allowed lang of config.
-     *
-     * @param string $locale
      */
-    private function setLocale($locale)
+    private function setLocale(string $locale): void
     {
         // Check if is allowed and set default locale if not
-        if (! Language::allowed($locale)) {
-            $locale = \config('app.locale');
+        if (!Language::allowed($locale)) {
+            $locale = config('app.locale');
         }
 
         // Set app language
         App::setLocale($locale);
 
         // Set carbon language
-        if (\config('language.carbon')) {
+        if (config('language.carbon')) {
             // Carbon uses only language code
-            if (\config('language.mode.code') == 'long') {
-                $locale = \explode('-', $locale)[0];
+            if (config('language.mode.code') == 'long') {
+                $locale = explode('-', (string) $locale)[0];
             }
 
             Carbon::setLocale($locale);
         }
 
         // Set date language
-        if (\config('language.date')) {
+        if (config('language.date')) {
             // Date uses only language code
-            if (\config('language.mode.code') == 'long') {
-                $locale = \explode('-', $locale)[0];
+            if (config('language.mode.code') == 'long') {
+                $locale = explode('-', (string) $locale)[0];
             }
 
-            \Date::setLocale($locale);
+            Date::setLocale($locale);
         }
     }
 
-    public function setDefaultLocale()
+    public function setDefaultLocale(): void
     {
-        $this->setLocale(\config('app.locale'));
+        $this->setLocale(config('app.locale'));
     }
 
-    public function setUserLocale()
+    public function setUserLocale(): void
     {
-        $user = \auth()->user();
+        $user = auth()->user();
 
-        if ($user->locale) {
-            $this->setLocale($user->locale);
+        if ($user->settings->locale) {
+            $this->setLocale($user->settings->locale);
         } else {
             $this->setDefaultLocale();
         }
     }
 
-    public function setSystemLocale($request)
+    public function setSystemLocale($request): void
     {
         if ($request->session()->has('locale')) {
-            $this->setLocale(\session('locale'));
+            $this->setLocale(session('locale'));
         } else {
             $this->setDefaultLocale();
         }
@@ -83,16 +85,12 @@ class SetLanguage
 
     /**
      * Handle an incoming request.
-     *
-     * @param \Illuminate\Http\Request $request
-     *
-     * @return mixed
      */
-    public function handle($request, Closure $next)
+    public function handle(\Illuminate\Http\Request $request, Closure $next): mixed
     {
         if ($request->has('lang')) {
             $this->setLocale($request->get('lang'));
-        } elseif (\auth()->check()) {
+        } elseif (auth()->check()) {
             $this->setUserLocale();
         } else {
             $this->setSystemLocale($request);

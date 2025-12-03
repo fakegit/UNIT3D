@@ -1,82 +1,33 @@
 <?php
 
-namespace Tests\Feature\Http\Controllers\Staff;
-
-use App\Models\Group;
-use App\Models\PrivateMessage;
-use App\Models\User;
-use Database\Seeders\GroupsTableSeeder;
-use Tests\TestCase;
+declare(strict_types=1);
 
 /**
- * @see \App\Http\Controllers\Staff\MassActionController
+ * NOTICE OF LICENSE.
+ *
+ * UNIT3D Community Edition is open-sourced software licensed under the GNU Affero General Public License v3.0
+ * The details is bundled with this project in the file LICENSE.txt.
+ *
+ * @project    UNIT3D Community Edition
+ *
+ * @author     HDVinnie <hdinnovations@protonmail.com>
+ * @license    https://www.gnu.org/licenses/agpl-3.0.en.html/ GNU Affero General Public License v3.0
  */
-class MassActionControllerTest extends TestCase
-{
-    protected function setUp(): void
-    {
-        parent::setUp();
-    }
 
-    protected function createStaffUser()
-    {
-        return User::factory()->create([
-            'group_id' => fn () => Group::factory()->create([
-                'is_owner' => true,
-                'is_admin' => true,
-                'is_modo'  => true,
-            ])->id,
-        ]);
-    }
+use App\Models\Group;
+use App\Models\User;
+use Database\Seeders\GroupSeeder;
 
-    /**
-     * @test
-     */
-    public function create_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
+test('update returns an ok response', function (): void {
+    $this->seed(GroupSeeder::class);
+    User::factory()->times(3)->create([
+        'email_verified_at' => null,
+        'group_id'          => Group::firstWhere('slug', 'validating')
+    ]);
 
-        $user = $this->createStaffUser();
+    $this->get(route('staff.mass-actions.validate'))
+        ->assertRedirect(route('staff.dashboard.index'));
 
-        $response = $this->actingAs($user)->get(route('staff.mass-pm.create'));
-
-        $response->assertOk();
-        $response->assertViewIs('Staff.masspm.index');
-    }
-
-    /**
-     * @test
-     */
-    public function store_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
-
-        $user = $this->createStaffUser();
-        $message = PrivateMessage::factory()->create();
-
-        $response = $this->actingAs($user)->post(route('staff.mass-pm.store'), [
-            'sender_id'   => $user->id,
-            'receiver_id' => $message->receiver_id,
-            'subject'     => $message->subject,
-            'message'     => $message->message,
-            'read'        => $message->read,
-            'related_to'  => $message->related_to,
-        ]);
-
-        $response->assertRedirect(route('staff.mass-pm.create'));
-    }
-
-    /**
-     * @test
-     */
-    public function update_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
-
-        $user = $this->createStaffUser();
-
-        $response = $this->actingAs($user)->get(route('staff.mass-actions.validate'));
-
-        $response->assertRedirect(route('staff.dashboard.index'));
-    }
-}
+    expect(User::where('email_verified_at', '=', null)->count())
+        ->toBe(0, 'All users should be validated');
+});

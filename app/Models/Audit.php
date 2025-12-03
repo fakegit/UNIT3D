@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -15,56 +18,62 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Audit.
  *
  * @property int                             $id
  * @property int|null                        $user_id
- * @property string                          $model_name
- * @property int                             $model_entry_id
+ * @property string                          $auditable_type
+ * @property int                             $auditable_id
  * @property string                          $action
  * @property mixed                           $record
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\User|null $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Audit newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Audit newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Audit query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Audit whereAction($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Audit whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Audit whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Audit whereModelEntryId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Audit whereModelName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Audit whereRecord($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Audit whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Audit whereUserId($value)
- * @mixin \Eloquent
  */
-class Audit extends Model
+#[AllowDynamicProperties]
+final class Audit extends Model
 {
+    /** @use HasFactory<\Database\Factories\AuditFactory> */
     use HasFactory;
 
     /**
-     * The Attributes That Are Mass Assignable.
+     * @var string[]
+     */
+    public array $values = [];
+
+    /**
+     * The attributes that are mass assignable.
      *
-     * @var array
+     * @var list<string>
      */
     protected $fillable = [
-        'user_id', 'model_name', 'model_entry_id', 'action', 'record',
+        'user_id', 'auditable_type', 'auditable_id', 'action', 'record',
     ];
 
     /**
-     * Belongs To A User.
+     * Get the user who triggered the audit.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
+    }
+
+    /**
+     * Get the parent auditable model.
+     *
+     * @return MorphTo<Model, $this>
+     */
+    public function auditable(): MorphTo
+    {
+        return $this->morphTo();
     }
 }

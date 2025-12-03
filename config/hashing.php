@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * NOTICE OF LICENSE.
  *
@@ -12,7 +14,6 @@
  */
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Default Hash Driver
@@ -59,5 +60,4 @@ return [
         'threads' => 2,
         'time'    => 2,
     ],
-
 ];

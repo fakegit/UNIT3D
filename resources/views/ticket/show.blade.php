@@ -1,224 +1,304 @@
-@extends('layout.default')
+@extends('layout.with-main-and-sidebar')
 
 @section('title')
-    <title>@lang('ticket.helpdesk') - {{ config('other.title') }}</title>
+    <title>{{ __('ticket.helpdesk') }} - {{ config('other.title') }}</title>
 @endsection
 
-@section('breadcrumb')
-    <li>
-        <a href="{{ route('tickets.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('ticket.helpdesk')</span>
+@section('breadcrumbs')
+    <li class="breadcrumbV2">
+        <a href="{{ route('tickets.index') }}" class="breadcrumb__link">
+            {{ __('ticket.helpdesk') }}
         </a>
     </li>
-    <li>
-        <a href="{{ route('tickets.show', ['id' => $ticket->id]) }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('ticket.ticket') #{{ $ticket->id }}</span>
-        </a>
+    <li class="breadcrumb--active">
+        {{ $ticket->subject }}
     </li>
 @endsection
 
-@section('content')
-<div class="container well">
-    <div class="row justify-content-center">
-        <div class="col-12">
-            @if(session('errors'))
-                <div class="alert alert-danger fade show">
-                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                    <h6><b>@lang('ticket.fix-errors')</b></h6>
-                    <ul class="mb-0">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
+@section('page', 'page__ticket--show')
+
+@section('main')
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ $ticket->subject }}</h2>
+        {{-- format-ignore-start --}}<div class="panel__body" style="white-space: pre-wrap">{{ $ticket->body }}</div>{{-- format-ignore-end --}}
+    </section>
+    @if ($user->group->is_modo)
+        <section class="panelV2">
+            <header class="panel__header">
+                <h2 class="panel__heading">{{ __('ticket.staff-notes') }}</h2>
+                <div class="panel__actions">
+                    <div class="panel__action" x-data="dialog">
+                        <button class="form__button form__button--text" x-bind="showDialog">
+                            {{ __('common.add') }}
+                        </button>
+                        <dialog class="dialog" x-bind="dialogElement">
+                            <h4 class="dialog__heading">Add staff note</h4>
+                            <form
+                                class="dialog__form"
+                                method="POST"
+                                action="{{ route('tickets.note.store', ['ticket' => $ticket]) }}"
+                                x-bind="dialogForm"
+                            >
+                                @csrf
+                                <p class="form__group">
+                                    <textarea
+                                        id="message"
+                                        class="form__textarea"
+                                        name="message"
+                                        type="text"
+                                        required
+                                    ></textarea>
+                                    <label class="form__label form__label--floating" for="message">
+                                        Message
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <button class="form__button form__button--filled">
+                                        {{ __('common.add') }}
+                                    </button>
+                                    <button
+                                        formmethod="dialog"
+                                        formnovalidate
+                                        class="form__button form__button--outlined"
+                                    >
+                                        {{ __('common.cancel') }}
+                                    </button>
+                                </p>
+                            </form>
+                        </dialog>
+                    </div>
+                </div>
+            </header>
+            <div class="data-table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>{{ __('common.staff') }}</th>
+                            <th>{{ __('user.note') }}</th>
+                            <th>{{ __('user.created-on') }}</th>
+                            <th>{{ __('common.action') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($ticket->notes as $note)
+                            <tr>
+                                <td>
+                                    <x-user-tag :anon="false" :user="$note->user" />
+                                </td>
+                                {{-- format-ignore-start --}}<td style="white-space: pre-wrap">@linkify($note->message)</td>{{-- format-ignore-end --}}
+                                <td>
+                                    <time
+                                        datetime="{{ $note->created_at }}"
+                                        title="{{ $note->created_at }}"
+                                    >
+                                        {{ $note->created_at->diffForHumans() }}
+                                    </time>
+                                </td>
+                                <td>
+                                    <menu class="data-table__actions">
+                                        <li class="data-table__action">
+                                            <form
+                                                action="{{ route('tickets.note.destroy', ['ticket' => $ticket]) }}"
+                                                method="POST"
+                                                x-data="confirmation"
+                                            >
+                                                @csrf
+                                                @method('DELETE')
+                                                <p class="form__group form__group--horizontal">
+                                                    <button
+                                                        x-on:click.prevent="confirmAction"
+                                                        data-b64-deletion-message="{{ base64_encode('Are you sure you want to delete this note: ' . $note->message . '?') }}"
+                                                        class="form__button form__button--text form__button--centered"
+                                                    >
+                                                        {{ __('ticket.delete') }}
+                                                    </button>
+                                                </p>
+                                            </form>
+                                        </li>
+                                    </menu>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="4">No notes</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    @endif
+
+    <livewire:comments :model="$ticket" />
+@endsection
+
+@section('sidebar')
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ __('common.info') }}</h2>
+        <dl class="key-value">
+            <div class="key-value__group">
+                <dt>ID</dt>
+                <dd>{{ $ticket->id }}</dd>
+            </div>
+            <div class="key-value__group">
+                <dt>{{ __('common.created_at') }}</dt>
+                <dd>{{ $ticket->created_at->format('Y-m-d') }}</dd>
+            </div>
+            <div class="key-value__group">
+                <dt>{{ __('ticket.opened-by') }}</dt>
+                <dd>
+                    <x-user-tag :user="$ticket->user" :anon="false" />
+                </dd>
+            </div>
+            <div class="key-value__group">
+                <dt>{{ __('ticket.category') }}</dt>
+                <dd>{{ $ticket->category->name }}</dd>
+            </div>
+            <div class="key-value__group">
+                <dt>{{ __('ticket.priority') }}</dt>
+                <dd>
+                    <i
+                        class="{{ config('other.font-awesome') }} {{ $ticket->priority->icon }}"
+                        style="color: {{ $ticket->priority->color }}"
+                    ></i>
+                    {{ $ticket->priority->name }}
+                </dd>
+            </div>
+            @if ($ticket->closed_at !== null)
+                <div class="key-value__group">
+                    <dt>{{ __('ticket.closed') }}</dt>
+                    <dd>
+                        <time
+                            datetime="{{ $ticket->closed_at }}"
+                            title="{{ $ticket->closed_at }}"
+                        >
+                            {{ $ticket->closed_at->format('Y-m-d') }}
+                        </time>
+                    </dd>
                 </div>
             @endif
+        </dl>
+    </section>
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ __('common.actions') }}</h2>
+        <div class="panel__body">
+            @if ($user->group->is_modo)
+                <form
+                    class="form form--horizontal"
+                    action="{{ route('tickets.assignee.store', ['ticket' => $ticket]) }}"
+                    method="POST"
+                    x-data
+                >
+                    @csrf
+                    <p class="form__group">
+                        <select
+                            id="staff_id"
+                            name="staff_id"
+                            class="form__select"
+                            x-on:change="$root.submit()"
+                        >
+                            <option hidden disabled selected value=""></option>
+                            @foreach (App\Models\User::select(['id', 'username'])->whereIn('group_id', App\Models\Group::where('is_modo', 1)->whereNotIn('id', [9])->pluck('id')->toArray())->get() as $user)
+                                <option
+                                    value="{{ $user->id }}"
+                                    @selected($user->id === $ticket->staff_id)
+                                >
+                                    {{ $user->username }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <label class="form__label form__label--floating" for="staff_id">
+                            {{ __('ticket.assign') }}
+                        </label>
+                    </p>
+                </form>
 
-                <div class="col-md-8">
-                    <div class="panel panel-chat shoutbox">
-                        <div class="panel-heading">@lang('ticket.ticket') <i class="fas fa-hashtag"></i> {{ $ticket->id }}</div>
-                        <div class="panel-body">
-                        <span class="float-right small text-right">
-                            <i class="far fa-user"></i> @lang('ticket.opened-by')
-                            <a href="{{ route('users.show', ['username' => $ticket->user->username]) }}">
-                                {{ $ticket->user->username }}
-                            </a>
-                            <i class="far fa-clock"></i>  {{ $ticket->created_at->format('m/d/Y') }}
-                            <div class="form-inline">
-                                <div class="form-group">
-                                    @if(empty($ticket->closed_at))
-                                        <form style="display: inline;" role="form" method="POST" action="{{ route('tickets.close', ['id' => $ticket->id]) }}">
-                                            @csrf
-                                            <button type="submit" class="btn btn-xs btn-warning"><i class="fas fa-times"></i> @lang('ticket.close')</button>
-                                        </form>
-                                    @endif
-                                        @if(!empty($ticket->closed_at))
-                                            <span style="display: inline;" class="text-danger">@lang('ticket.closed') {{ $ticket->closed_at->format('m/d/Y') }}</span>
-                                        @endif
-                                        <form style="display: inline;" role="form" method="POST" action="{{ route('tickets.destroy', ['id' => $ticket->id]) }}">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-xs btn-danger"><i class="fas fa-times"></i> @lang('ticket.delete')</button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </span>
-                            @if($user->group->is_modo)
-                                <div class="btn-group" role="group">
-                                    <div class="mb-10 form-inline pull-right">
-                                        <div class="form-group">
-                                            @if(empty($ticket->staff_id))
-                                                <form role="form" method="POST" action="{{ route('tickets.assign', ['id' => $ticket->id]) }}">
-                                                    @csrf
-                                                    <select name="user_id" class="form-control">
-                                                        @foreach(App\Models\User::select(['id', 'username'])->whereIn('group_id', App\Models\Group::where('is_modo', 1)->whereNotIn('id', [9])->pluck('id')->toArray())->get() as $user)
-                                                            <option value="{{ $user->id }}">{{ $user->username }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                    <button type="submit" class="btn btn-sm btn-warning">@lang('ticket.assign')</button>
-                                                </form>
-                                            @else
-                                                <form role="form" method="POST" action="{{ route('tickets.unassign', ['id' => $ticket->id]) }}">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-warning">@lang('ticket.unassign')</button>
-                                                </form>
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
-                            @endif
-                            <hr style="margin: 8px">
-                            <div class="row">
-                                @if(isset($ticket->staff_id))
-                                    <div class="col-md-3">
-                                        <label for=""><b>@lang('ticket.assigned-staff')</b></label><br>
-                                        <i class="far fa-user"></i>
-                                        <a href="{{ route('users.show', ['username' => $ticket->staff->username]) }}">
-                                            {{ $ticket->staff->username }}
-                                        </a>
-                                    </div>
-                                @endif
-                                <div class="col-md-4">
-                                    <label for=""><b>@lang('ticket.category')</b></label><br>
-                                    {{ $ticket->category->name }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label for=""><b>@lang('ticket.priority')</b></label><br>
-                                    @if($ticket->priority->name === 'Low')
-                                        <i class="fas fa-circle text-yellow"></i>
-                                    @elseif ($ticket->priority->name === 'Medium')
-                                        <i class="fas fa-circle text-orange"></i>
-                                    @elseif ($ticket->priority->name === 'High')
-                                        <i class="fas fa-circle text-red"></i>
-                                    @endif
-                                    {{ $ticket->priority->name }}
-                                </div>
-                                <div class="col-md-3">
-                                    <label for=""><b>@lang('ticket.subject')</b></label><br>
-                                    {{ $ticket->subject }}
-                                </div>
-                            </div>
-                            <hr style="margin: 8px">
-                            <div class="row">
-                                <div class="col-md-12">
-                                    <label for=""><b>@lang('ticket.description')</b></label><br>
-                                    {{ $ticket->body }}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-4">
-                    <div class="panel panel-chat shoutbox">
-                        <div class="panel-heading"><i class="fas fa-file-pdf"></i> @lang('ticket.attachments')</div>
-                        <div class="panel-body">
-                            @livewire('attachment-upload', ['id' => $ticket->id])
-                            @if(count($ticket->attachments))
-                                <div class="table-responsive">
-                                    <table class="table" style="margin-bottom:0">
-                                        <tbody>
-                                        @foreach($ticket->attachments as $attachment)
-                                            <tr>
-                                                <td style="width:100px">
-                                                    <form action="{{ route('tickets.attachment.download', $attachment) }}" method="POST">
-                                                        @csrf
-                                                        <button class="btn btn-success btn-sm">@lang('ticket.download')</button>
-                                                    </form>
-                                                </td>
-                                                <td>{{ $attachment->file_name }}</td>
-                                            </tr>
-                                        @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
-                            @else
-                                @lang('ticket.no-attach')
-                            @endif
-                        </div>
-                    </div>
-
-                </div>
-
-                    <div class="col-md-12 col-sm-12">
-                        <div class="panel panel-chat shoutbox">
-                            <div class="panel-heading">
-                                <h4>
-                                    <i class="{{ config('other.font-awesome') }} fa-comment"></i> @lang('common.comments')
-                                </h4>
-                            </div>
-                            <div class="panel-body no-padding">
-                                <ul class="media-list comments-list">
-                                    @if (count($ticket->comments) == 0)
-                                        <div class="text-center">
-                                            <h4 class="text-bold text-danger">
-                                                <i class="{{ config('other.font-awesome') }} fa-frown"></i> @lang('common.no-comments')!
-                                            </h4>
-                                        </div>
-                                        @else
-                                        @foreach ($ticket->comments as $comment)
-                                            <li class="media" style="border-left: 5px solid rgb(1,188,140);">
-                                                <div class="media-body">
-                                                    <a href="{{ route('users.show', ['username' => $comment->user->username]) }}"
-                                                       class="pull-left" style="padding-right: 10px;">
-                                                        @if ($comment->user->image != null)
-                                                            <img src="{{ url('files/img/' . $comment->user->image) }}"
-                                                                 alt="{{ $comment->user->username }}" class="img-avatar-48"></a>
-                                                        @else
-                                                        <img src="{{ url('img/profile.png') }}" alt="{{ $comment->user->username }}"
-                                                             class="img-avatar-48"></a>
-                                                        @endif
-                                                    <strong>
-                                                        <a href="{{ route('users.show', ['username' => $comment->user->username]) }}"
-                                                           style="color:{{ $comment->user->group->color }};">
-                                                            <span><i class="{{ $comment->user->group->icon }}"></i> {{ $comment->user->username }}</span>
-                                                        </a>
-                                                    </strong>
-                                                    <span class="text-muted"><small><em>{{ $comment->created_at->toDayDateTimeString() }} ({{ $comment->created_at->diffForHumans() }})</em></small></span>
-                                                    <div class="pt-5">
-                                                        @joypixels($comment->getContentHtml())
-                                                    </div>
-                                                </div>
-                                            </li>
-                                        @endforeach
-                                    @endif
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-
-                <div class="col-md-12">
-                    <form role="form" method="POST" action="{{ route('comment_ticket', ['id' => $ticket->id]) }}">
+                @if ($ticket->staff_id !== null)
+                    <form
+                        action="{{ route('tickets.assignee.destroy', ['ticket' => $ticket]) }}"
+                        method="POST"
+                    >
                         @csrf
-                        <div class="form-group">
-                            <label for="content">@lang('common.your-comment'):</label>
-                            <textarea id="content" name="content" cols="30" rows="5" class="form-control"></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-success">@lang('common.submit')</button>
+                        @method('DELETE')
+                        <p class="form__group form__group--horizontal">
+                            <button
+                                class="form__button form__button--filled form__button--centered"
+                            >
+                                {{ __('ticket.unassign') }}
+                            </button>
+                        </p>
                     </form>
-                </div>
+                @endif
+
+                <form action="{{ route('tickets.destroy', ['ticket' => $ticket]) }}" method="POST">
+                    @csrf
+                    @method('DELETE')
+                    <p class="form__group form__group--horizontal">
+                        <button class="form__button form__button--filled form__button--centered">
+                            {{ __('ticket.delete') }}
+                        </button>
+                    </p>
+                </form>
+            @endif
+
+            @if ($ticket->closed_at === null)
+                <form action="{{ route('tickets.close', ['ticket' => $ticket]) }}" method="POST">
+                    <p class="form__group form__group--horizontal">
+                        @csrf
+                        <button class="form__button form__button--filled form__button--centered">
+                            {{ __('ticket.close') }}
+                        </button>
+                    </p>
+                </form>
+            @else
+                <form action="{{ route('tickets.reopen', ['ticket' => $ticket]) }}" method="POST">
+                    <p class="form__group form__group--horizontal">
+                        @csrf
+                        <button class="form__button form__button--filled form__button--centered">
+                            {{ __('ticket.reopen') }}
+                        </button>
+                    </p>
+                </form>
+            @endif
         </div>
-    </div>
-</div>
+    </section>
+    @livewire('attachment-upload', ['id' => $ticket->id])
+    @if ($pastUserTickets->count() > 0)
+        <section class="panelV2">
+            <h2 class="panel__heading">Other tickets</h2>
+            <div class="data-table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>{{ __('common.name') }}</th>
+                            <th>{{ __('ticket.created') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($pastUserTickets as $ticket)
+                            <tr>
+                                <td>
+                                    <i
+                                        class="{{ config('other.font-awesome') }} {{ $ticket->priority->icon }}"
+                                        style="color: {{ $ticket->priority->color }}"
+                                    ></i>
+                                    <a href="{{ route('tickets.show', ['ticket' => $ticket]) }}">
+                                        {{ $ticket->subject }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <time
+                                        title="{{ $ticket->created_at }}"
+                                        datetime="{{ $ticket->created_at }}"
+                                    >
+                                        {{ $ticket->created_at->format('Y-m') }}
+                                    </time>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    @endif
 @endsection

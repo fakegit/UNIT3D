@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -23,27 +26,27 @@ class AchievementUnlocked
     /**
      * AchievementUnlocked Constructor.
      */
-    public function __construct(private ChatRepository $chatRepository)
+    public function __construct(private readonly ChatRepository $chatRepository)
     {
     }
 
     /**
      * Handle the event.
-     *
-     *
-     * @return void
      */
-    public function handle(Unlocked $unlocked)
+    public function handle(Unlocked $unlocked): void
     {
         // There's an AchievementProgress instance located on $event->progress
-        $user = User::where('id', '=', $unlocked->progress->achiever_id)->first();
-        Session::flash('achievement', $unlocked->progress->details->name);
+        $user = User::findOrFail($unlocked->progress->achiever_id);
 
-        if ($user->private_profile == 0) {
-            $profileUrl = \href_profile($user);
+        if (auth()->id() === $user->id) {
+            Session::flash('achievement', $unlocked->progress->details->name);
+        }
+
+        if ($user->privacy?->private_profile == 0) {
+            $profileUrl = href_profile($user);
 
             $this->chatRepository->systemMessage(
-                \sprintf('User [url=%s]%s[/url] has unlocked the %s achievement :medal:', $profileUrl, $user->username, $unlocked->progress->details->name)
+                \sprintf('User [url=%s]%s[/url] has unlocked the %s achievement!', $profileUrl, $user->username, $unlocked->progress->details->name)
             );
         }
     }

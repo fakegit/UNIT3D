@@ -1,18 +1,8 @@
 <?php
-/**
- * NOTICE OF LICENSE.
- *
- * UNIT3D Community Edition is open-sourced software licensed under the GNU Affero General Public License v3.0
- * The details is bundled with this project in the file LICENSE.txt.
- *
- * @project    UNIT3D Community Edition
- *
- * @author     HDVinnie <hdinnovations@protonmail.com>
- * @license    https://www.gnu.org/licenses/agpl-3.0.en.html/ GNU Affero General Public License v3.0
- */
+
+declare(strict_types=1);
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Default Database Connection Name
@@ -43,10 +33,9 @@ return [
     */
 
     'connections' => [
-
         'sqlite' => [
             'driver'                  => 'sqlite',
-            'url'                     => env('DATABASE_URL'),
+            'url'                     => env('DB_URL'),
             'database'                => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix'                  => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
@@ -54,7 +43,7 @@ return [
 
         'mysql' => [
             'driver'         => 'mysql',
-            'url'            => env('DATABASE_URL'),
+            'url'            => env('DB_URL'),
             'host'           => env('DB_HOST', '127.0.0.1'),
             'port'           => env('DB_PORT', '3306'),
             'database'       => env('DB_DATABASE', 'forge'),
@@ -67,20 +56,46 @@ return [
             'prefix_indexes' => true,
             'strict'         => true,
             'engine'         => null,
-            'options'        => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+            'modes'          => [
+                'ANSI',
+            ],
+            'options' => \extension_loaded('pdo_mysql') ? array_filter([
+                Pdo\Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
-
             'dump' => [
                 'dump_binary_path' => '/usr/bin', // only the path, so without `mysqldump` or `pg_dump`
                 'use_single_transaction',
-                'timeout' => 60 * 10, // 10 minute timeout
+                'timeout'          => 60 * 10, // 10 minute timeout
+                'add_extra_option' => '--password='.env('DB_PASSWORD', ''),
             ],
+        ],
+
+        'mariadb' => [
+            'driver'         => 'mariadb',
+            'url'            => env('DB_URL'),
+            'host'           => env('DB_HOST', '127.0.0.1'),
+            'port'           => env('DB_PORT', '3306'),
+            'database'       => env('DB_DATABASE', 'laravel'),
+            'username'       => env('DB_USERNAME', 'root'),
+            'password'       => env('DB_PASSWORD', ''),
+            'unix_socket'    => env('DB_SOCKET', ''),
+            'charset'        => env('DB_CHARSET', 'utf8mb4'),
+            'collation'      => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix'         => '',
+            'prefix_indexes' => true,
+            'strict'         => true,
+            'engine'         => null,
+            'modes'          => [
+                'ANSI',
+            ],
+            'options' => \extension_loaded('pdo_mysql') ? array_filter([
+                Pdo\Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
         ],
 
         'pgsql' => [
             'driver'         => 'pgsql',
-            'url'            => env('DATABASE_URL'),
+            'url'            => env('DB_URL'),
             'host'           => env('DB_HOST', '127.0.0.1'),
             'port'           => env('DB_PORT', '5432'),
             'database'       => env('DB_DATABASE', 'forge'),
@@ -89,7 +104,7 @@ return [
             'charset'        => 'utf8',
             'prefix'         => '',
             'prefix_indexes' => true,
-            'schema'         => 'public',
+            'search_path'    => 'public',
             'sslmode'        => 'prefer',
         ],
 
@@ -104,8 +119,9 @@ return [
             'charset'        => 'utf8',
             'prefix'         => '',
             'prefix_indexes' => true,
+            // 'encrypt' => env('DB_ENCRYPT', 'yes'),
+            // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
-
     ],
 
     /*
@@ -119,7 +135,10 @@ return [
     |
     */
 
-    'migrations' => 'migrations',
+    'migrations' => [
+        'table'                  => 'migrations',
+        'update_date_on_publish' => false, // disable to preserve original behavior for existing applications
+    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -133,30 +152,32 @@ return [
     */
 
     'redis' => [
-
-        'client' => env('REDIS_CLIENT', 'predis'),
+        'client' => env('REDIS_CLIENT', 'phpredis'),
 
         'default' => [
             'url'                => env('REDIS_URL'),
             'host'               => env('REDIS_HOST', '127.0.0.1'),
-            'password'           => env('REDIS_PASSWORD', null),
-            'port'               => env('REDIS_PORT', 6379),
-            'database'           => env('REDIS_DB', 0),
+            'username'           => env('REDIS_USERNAME'),
+            'password'           => env('REDIS_PASSWORD'),
+            'port'               => env('REDIS_PORT', '6379'),
+            'database'           => env('REDIS_DB', '0'),
             'read_write_timeout' => -1,
         ],
 
         'cache' => [
             'url'                => env('REDIS_URL'),
             'host'               => env('REDIS_HOST', '127.0.0.1'),
-            'password'           => env('REDIS_PASSWORD', null),
-            'port'               => env('REDIS_PORT', 6379),
-            'database'           => env('REDIS_CACHE_DB', 1),
+            'username'           => env('REDIS_USERNAME'),
+            'password'           => env('REDIS_PASSWORD'),
+            'port'               => env('REDIS_PORT', '6379'),
+            'database'           => env('REDIS_CACHE_DB', '1'),
             'read_write_timeout' => -1,
         ],
 
         'job' => [
             'url'                => env('REDIS_URL'),
             'host'               => env('REDIS_HOST', '127.0.0.1'),
+            'username'           => env('REDIS_USERNAME'),
             'password'           => env('REDIS_PASSWORD', null),
             'port'               => env('REDIS_PORT', 6379),
             'database'           => env('REDIS_JOB_DB', 2),
@@ -166,6 +187,7 @@ return [
         'broadcast' => [
             'url'                => env('REDIS_URL'),
             'host'               => env('REDIS_HOST', '127.0.0.1'),
+            'username'           => env('REDIS_USERNAME'),
             'password'           => env('REDIS_PASSWORD', null),
             'port'               => env('REDIS_PORT', 6379),
             'database'           => env('REDIS_BROADCAST_DB', 3),
@@ -175,14 +197,21 @@ return [
         'session' => [
             'url'                => env('REDIS_URL'),
             'host'               => env('REDIS_HOST', '127.0.0.1'),
+            'username'           => env('REDIS_USERNAME'),
             'password'           => env('REDIS_PASSWORD', null),
             'port'               => env('REDIS_PORT', 6379),
-            'database'           => env('REDIS_BROADCAST_DB', 4),
+            'database'           => env('REDIS_SESSION_DB', 4),
             'read_write_timeout' => -1,
         ],
 
+        'announce' => [
+            'url'                => env('REDIS_URL'),
+            'host'               => env('REDIS_HOST', '127.0.0.1'),
+            'username'           => env('REDIS_USERNAME'),
+            'password'           => env('REDIS_PASSWORD', null),
+            'port'               => env('REDIS_PORT', 6379),
+            'database'           => env('REDIS_ANNOUNCE_DB', 5),
+            'read_write_timeout' => -1,
+        ],
     ],
-
-    'pristine-db-file' => env('PRISTINE_DB_FILE'),
-
 ];

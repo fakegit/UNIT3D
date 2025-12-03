@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,7 +17,7 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
-use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Http;
 
 /**
  * @see \Tests\Todo\Feature\Http\Controllers\Staff\VersionControllerTest
@@ -22,32 +25,15 @@ use GuzzleHttp\Client;
 class VersionController extends Controller
 {
     /**
-     * @var VersionController
-     */
-    private $versionController;
-
-    public function __construct()
-    {
-        $this->versionController = \config('unit3d.version');
-    }
-
-    /**
      * Check the latest release of UNIT3D and compare them to the local version.
-     *
-     * @throws \GuzzleHttp\Exception\GuzzleException
-     * @throws \JsonException
-     *
-     * @return string
      */
-    public function checkVersion()
+    public function checkVersion(): \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
     {
-        $client = new Client();
-        $response = \json_decode($client->get('//api.github.com/repos/HDInnovations/UNIT3D/releases')->getBody(), true, 512, JSON_THROW_ON_ERROR);
-        $lastestVersion = $response[0]['tag_name'];
+        $latestVersion = Http::get('//api.github.com/repos/HDInnovations/UNIT3D/releases')[0]['tag_name'];
 
-        return \response([
-            'updated'       => ! \version_compare($this->versionController, $lastestVersion, '<'),
-            'latestversion' => $lastestVersion,
+        return response([
+            'updated'       => !version_compare(config('unit3d.version'), $latestVersion, '<'),
+            'latestversion' => $latestVersion,
         ]);
     }
 }

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,10 +16,15 @@
 
 namespace App\Models;
 
-use App\Notifications\NewTopic;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Forum.
@@ -26,246 +34,141 @@ use Illuminate\Database\Eloquent\Model;
  * @property int|null                        $num_topic
  * @property int|null                        $num_post
  * @property int|null                        $last_topic_id
- * @property string|null                     $last_topic_name
- * @property string|null                     $last_topic_slug
+ * @property int|null                        $last_post_id
  * @property int|null                        $last_post_user_id
- * @property string|null                     $last_post_user_username
+ * @property \Illuminate\Support\Carbon|null $last_post_created_at
  * @property string|null                     $name
  * @property string|null                     $slug
  * @property string|null                     $description
- * @property int|null                        $parent_id
+ * @property int                             $forum_category_id
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Forum[] $forums
- * @property-read int|null $forums_count
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Permission[] $permissions
- * @property-read int|null $permissions_count
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Topic[] $sub_topics
- * @property-read int|null $sub_topics_count
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Topic[] $subscription_topics
- * @property-read int|null $subscription_topics_count
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Subscription[] $subscriptions
- * @property-read int|null $subscriptions_count
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Topic[] $topics
- * @property-read int|null $topics_count
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum whereDescription($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum whereLastPostUserId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum whereLastPostUserUsername($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum whereLastTopicId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum whereLastTopicName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum whereLastTopicSlug($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum whereNumPost($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum whereNumTopic($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum whereParentId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum wherePosition($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum whereSlug($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Forum whereUpdatedAt($value)
- * @mixin \Eloquent
  */
-class Forum extends Model
+#[AllowDynamicProperties]
+final class Forum extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\ForumFactory> */
+    use HasFactory;
+
     /**
-     * Has Many Topic.
+     * The attributes that aren't mass assignable.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @var string[]
      */
-    public function topics()
+    protected $guarded = ['id', 'created_at'];
+
+    /**
+     * Get the topics for the forum.
+     *
+     * @return HasMany<Topic, $this>
+     */
+    public function topics(): HasMany
     {
         return $this->hasMany(Topic::class);
     }
 
     /**
-     * Has Many Sub Topics.
+     * Get the category for the forum.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return BelongsTo<ForumCategory, $this>
      */
-    public function sub_topics()
+    public function category(): BelongsTo
     {
-        $children = $this->forums->pluck('id')->toArray();
-        if (\is_array($children)) {
-            return $this->hasMany(Topic::class)->orWhereIn('topics.forum_id', $children);
-        }
-
-        return $this->hasMany(Topic::class);
+        return $this->belongsTo(ForumCategory::class, 'forum_category_id');
     }
 
     /**
-     * Has Many Sub Forums.
+     * Get the posts for the forum.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasManyThrough<Post, Topic, $this>
      */
-    public function forums()
+    public function posts(): HasManyThrough
     {
-        return $this->hasMany(self::class, 'parent_id', 'id');
+        return $this->hasManyThrough(Post::class, Topic::class);
     }
 
     /**
-     * Has Many Subscribed Topics.
+     * Get the forum's last replied topic.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasOne<Topic, $this>
      */
-    public function subscription_topics()
+    public function lastRepliedTopicSlow(): HasOne
     {
-        if (\auth()->user() !== null) {
-            $id = $this->id;
-            $subscriptions = \auth()->user()->subscriptions->where('topic_id', '>', '0')->pluck('topic_id')->toArray();
-
-            return $this->hasMany(Topic::class)->where(function ($query) use ($id, $subscriptions) {
-                $query->whereIn('topics.id', [$id])->orWhereIn('topics.id', $subscriptions);
-            });
-        }
-
-        return $this->hasMany(Topic::class, 'id', 'topic_id');
+        return $this->hasOne(Topic::class)->ofMany('last_post_created_at', 'max');
     }
 
     /**
-     * Has Many Subscriptions.
+     * Get the last replied topic of the forum (cached).
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return BelongsTo<Topic, $this>
      */
-    public function subscriptions()
+    public function lastRepliedTopic(): BelongsTo
+    {
+        return $this->belongsTo(Topic::class, 'last_topic_id');
+    }
+
+    /**
+     * Get the latest poster of the forum (cached).
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function latestPoster(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'last_post_user_id');
+    }
+
+    /**
+     * Get the subscriptions for the forum.
+     *
+     * @return HasMany<Subscription, $this>
+     */
+    public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class, 'forum_id', 'id');
     }
 
     /**
-     * Has Many Permissions.
+     * Get the permissions for the forum.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<ForumPermission, $this>
      */
-    public function permissions()
+    public function permissions(): HasMany
     {
-        return $this->hasMany(Permission::class);
+        return $this->hasMany(ForumPermission::class);
     }
 
     /**
-     * Notify Subscribers Of A Forum When New Topic Is Made.
+     * Get the users that are subscribed to the forum.
      *
-     * @param $poster
-     * @param $topic
-     *
-     * @return string
+     * @return BelongsToMany<User, $this>
      */
-    public function notifySubscribers($poster, $topic)
+    public function subscribedUsers(): BelongsToMany
     {
-        $subscribers = User::selectRaw('distinct(users.id),max(users.username) as username,max(users.group_id) as group_id')->with('group')->where('users.id', '!=', $topic->first_post_user_id)
-            ->join('subscriptions', 'subscriptions.user_id', '=', 'users.id')
-            ->leftJoin('user_notifications', 'user_notifications.user_id', '=', 'users.id')
-            ->where('subscriptions.forum_id', '=', $topic->forum_id)
-            ->whereRaw('(user_notifications.show_subscription_forum = 1 OR user_notifications.show_subscription_forum is null)')
-            ->groupBy('users.id')->get();
-
-        foreach ($subscribers as $subscriber) {
-            if ($subscriber->acceptsNotification($poster, $subscriber, 'subscription', 'show_subscription_forum')) {
-                $subscriber->notify(new NewTopic('forum', $poster, $topic));
-            }
-        }
+        return $this->belongsToMany(User::class, Subscription::class);
     }
 
     /**
-     * Notify Staffers When New Staff Topic Is Made.
+     * Scope a query to only include forums a user is authorized to.
      *
-     * @param $poster
-     * @param $topic
-     *
-     * @return string
+     * @param  \Illuminate\Database\Eloquent\Builder<self> $query
+     * @return \Illuminate\Database\Eloquent\Builder<self>
      */
-    public function notifyStaffers($poster, $topic)
-    {
-        $staffers = User::leftJoin('groups', 'users.group_id', '=', 'groups.id')
-            ->select('users.id')
-            ->where('users.id', '<>', $poster->id)
-            ->where('groups.is_modo', 1)
-            ->get();
-
-        foreach ($staffers as $staffer) {
-            $staffer->notify(new NewTopic('staff', $poster, $topic));
-        }
-    }
-
-    /**
-     * Returns A Table With The Forums In The Category.
-     *
-     * @return string
-     */
-    public function getForumsInCategory()
-    {
-        return self::where('parent_id', '=', $this->id)->get();
-    }
-
-    /**
-     * Returns A Table With The Forums In The Category.
-     *
-     * @param $forumId
-     *
-     * @return string
-     */
-    public function getForumsInCategoryById($forumId)
-    {
-        return self::where('parent_id', '=', $forumId)->get();
-    }
-
-    /**
-     * Returns The Category Nn Which The Forum Is Located.
-     *
-     * @return string
-     */
-    public function getCategory()
-    {
-        return self::find($this->parent_id);
-    }
-
-    /**
-     * Count The Number Of Posts In The Forum.
-     *
-     * @param $forumId
-     *
-     * @return string
-     */
-    public function getPostCount($forumId)
-    {
-        $topics = self::find($forumId)->topics;
-        $count = 0;
-        foreach ($topics as $t) {
-            $count += $t->posts()->count();
-        }
-
-        return $count;
-    }
-
-    /**
-     * Count The Number Of Topics In The Forum.
-     *
-     * @param $forumId
-     *
-     * @return string
-     */
-    public function getTopicCount($forumId)
-    {
-        $forum = self::find($forumId);
-
-        return Topic::where('forum_id', '=', $forum->id)->count();
-    }
-
-    /**
-     * Returns The Permission Field.
-     *
-     * @return string
-     */
-    public function getPermission()
-    {
-        $group = \auth()->check() ? \auth()->user()->group : Group::where('slug', 'guest')->first();
-
-        return $group->permissions->where('forum_id', $this->id)->first();
+    public function scopeAuthorized(
+        \Illuminate\Database\Eloquent\Builder $query,
+        ?bool $canReadTopic = null,
+        ?bool $canReplyTopic = null,
+        ?bool $canStartTopic = null,
+    ): \Illuminate\Database\Eloquent\Builder {
+        return $query
+            ->whereRelation(
+                'permissions',
+                fn ($query) => $query
+                    ->where('group_id', '=', auth()->user()->group_id)
+                    ->when($canReadTopic !== null, fn ($query) => $query->where('read_topic', '=', $canReadTopic))
+                    ->when($canReplyTopic !== null, fn ($query) => $query->where('reply_topic', '=', $canReplyTopic))
+                    ->when($canStartTopic !== null, fn ($query) => $query->where('start_topic', '=', $canStartTopic))
+            );
     }
 }

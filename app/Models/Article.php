@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,125 +16,70 @@
 
 namespace App\Models;
 
-use App\Helpers\Bbcode;
-use App\Helpers\Linkify;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use voku\helper\AntiXSS;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Article.
  *
  * @property int                             $id
  * @property string                          $title
- * @property string                          $slug
  * @property string|null                     $image
  * @property string                          $content
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property int                             $user_id
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Comment[] $comments
- * @property-read int|null $comments_count
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Article newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Article newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Article query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Article whereContent($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Article whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Article whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Article whereImage($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Article whereSlug($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Article whereTitle($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Article whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Article whereUserId($value)
- * @mixin \Eloquent
  */
-class Article extends Model
+#[AllowDynamicProperties]
+final class Article extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\ArticleFactory> */
+    use HasFactory;
+
     /**
-     * Belongs To A User.
+     * The attributes that aren't mass assignable.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @var string[]
      */
-    public function user()
+    protected $guarded = ['id', 'created_at', 'updated_at'];
+
+    /**
+     * Get the author of the article.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Has Many Comments.
+     * Get the comments for the article.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return MorphMany<Comment, $this>
      */
-    public function comments()
+    public function comments(): MorphMany
     {
-        return $this->hasMany(Comment::class);
+        return $this->morphMany(Comment::class, 'commentable');
     }
 
     /**
-     * Article Trimming.
+     * Get the unreads for the article.
      *
-     * @param int  $length
-     * @param bool $ellipses
-     * @param bool $stripHtml
-     *
-     * @return string Formatted And Trimmed Content
+     * @return HasMany<UnreadArticle, $this>
      */
-    public function getBrief($length = 20, $ellipses = true, $stripHtml = false)
+    public function unreads(): HasMany
     {
-        $input = $this->content;
-        //strip tags, if desired
-        if ($stripHtml) {
-            $input = \strip_tags($input);
-        }
-
-        //no need to trim, already shorter than trim length
-        if (\strlen($input) <= $length) {
-            return $input;
-        }
-
-        //find last space within length
-        $lastSpace = \strrpos(\substr($input, 0, $length), ' ');
-        $trimmedText = \substr($input, 0, $lastSpace);
-
-        //add ellipses (...)
-        if ($ellipses) {
-            $trimmedText .= '...';
-        }
-
-        return $trimmedText;
-    }
-
-    /**
-     * Set The Articles Content After Its Been Purified.
-     *
-     * @param string $value
-     *
-     * @return void
-     */
-    public function setContentAttribute($value)
-    {
-        $this->attributes['content'] = \htmlspecialchars((new AntiXSS())->xss_clean($value), ENT_NOQUOTES);
-    }
-
-    /**
-     * Parse Content And Return Valid HTML.
-     *
-     * @return string Parsed BBCODE To HTML
-     */
-    public function getContentHtml()
-    {
-        $bbcode = new Bbcode();
-        $linkify = new Linkify();
-
-        return $linkify->linky($bbcode->parse($this->content, true));
+        return $this->HasMany(UnreadArticle::class);
     }
 }

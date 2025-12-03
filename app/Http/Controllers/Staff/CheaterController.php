@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,8 +17,7 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
-use App\Models\History;
-use Illuminate\Support\Facades\DB;
+use App\Models\User;
 
 /**
  * @see \Tests\Feature\Http\Controllers\Staff\CheaterControllerTest
@@ -27,23 +29,20 @@ class CheaterController extends Controller
      */
     public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $cheaters = History::with('user')
-            ->select(['*'])
-            ->join(
-                DB::raw('(SELECT MAX(id) AS id FROM history GROUP BY history.user_id) AS unique_history'),
-                function ($join) {
-                    $join->on('history.id', '=', 'unique_history.id');
-                }
-            )
-            ->where('seeder', '=', 0)
-            ->where('active', '=', 0)
-            ->where('seedtime', '=', 0)
-            ->where('actual_downloaded', '=', 0)
-            ->where('actual_uploaded', '=', 0)
-            ->whereNull('completed_at')
-            ->latest()
-            ->paginate(25);
-
-        return \view('Staff.cheater.index', ['cheaters' => $cheaters]);
+        return view('Staff.cheater.index', [
+            'cheaters' => User::query()
+                ->whereHas('history', function ($query): void {
+                    $query->where('seeder', '=', 0);
+                    $query->where('active', '=', 0);
+                    $query->where('seedtime', '=', 0);
+                    $query->where('actual_downloaded', '=', 0);
+                    $query->where('actual_uploaded', '=', 0);
+                    $query->whereNull('completed_at');
+                })
+                ->whereRelation('group', 'slug', '!=', 'banned')
+                ->where('id', '!=', 1) // System
+                ->latest()
+                ->paginate(25),
+        ]);
     }
 }

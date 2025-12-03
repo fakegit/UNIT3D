@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,9 +17,12 @@
 namespace App\Models;
 
 use App\Traits\Auditable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Warning.
@@ -24,90 +30,95 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int                             $id
  * @property int                             $user_id
  * @property int                             $warned_by
- * @property int                             $torrent
+ * @property int|null                        $torrent
  * @property string                          $reason
- * @property string|null                     $expires_on
- * @property int                             $active
+ * @property \Illuminate\Support\Carbon|null $expires_on
+ * @property bool                            $active
  * @property int|null                        $deleted_by
  * @property \Illuminate\Support\Carbon|null $deleted_at
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\User|null $deletedBy
- * @property-read \App\Models\User $staffuser
- * @property-read \App\Models\Torrent $torrenttitle
- * @property-read \App\Models\User $warneduser
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Warning newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Warning newQuery()
- * @method static \Illuminate\Database\Query\Builder|\App\Models\Warning onlyTrashed()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Warning query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Warning whereActive($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Warning whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Warning whereDeletedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Warning whereDeletedBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Warning whereExpiresOn($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Warning whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Warning whereReason($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Warning whereTorrent($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Warning whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Warning whereUserId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Warning whereWarnedBy($value)
- * @method static \Illuminate\Database\Query\Builder|\App\Models\Warning withTrashed()
- * @method static \Illuminate\Database\Query\Builder|\App\Models\Warning withoutTrashed()
- * @mixin \Eloquent
  */
-class Warning extends Model
+#[AllowDynamicProperties]
+final class Warning extends Model
 {
-    use HasFactory;
-    use SoftDeletes;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\WarningFactory> */
+    use HasFactory;
+    use SoftDeletes;
+
+    protected $guarded = [];
+
     /**
-     * Belongs To A Torrent.
+     * Get the attributes that should be cast.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return array{expires_on: 'datetime', active: 'bool'}
      */
-    public function torrenttitle()
+    protected function casts(): array
     {
-        return $this->belongsTo(Torrent::class, 'torrent');
+        return [
+            'expires_on' => 'datetime',
+            'active'     => 'bool',
+        ];
     }
 
     /**
-     * Belongs To A User.
+     * Get the torrent associated with the warning.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Torrent, $this>
      */
-    public function warneduser()
+    public function torrent(): BelongsTo
+    {
+        return $this->belongsTo(Torrent::class);
+    }
+
+    /**
+     * Get the warned user.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id')->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A USer.
+     * Get the staff user that issued the warning.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function staffuser()
+    public function staff(): BelongsTo
     {
         return $this->belongsTo(User::class, 'warned_by')->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A USer.
+     * Get the staff user that revoked the warning.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function deletedBy()
+    public function deletedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'deleted_by')->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
+    }
+
+    /**
+     * Scope query to only include active warnings.
+     *
+     * @param Builder<Warning> $query
+     */
+    public function scopeActive(Builder $query): void
+    {
+        $query->where('active', '=', 1);
     }
 }

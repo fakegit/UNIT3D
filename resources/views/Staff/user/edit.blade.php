@@ -1,285 +1,381 @@
-@extends('layout.default')
+@extends('layout.with-main-and-sidebar')
 
 @section('title')
-    <title>@lang('common.user') @lang('common.edit') - @lang('staff.staff-dashboard') - {{ config('other.title') }}</title>
+    <title>
+        {{ __('common.user') }} {{ __('common.edit') }} - {{ __('staff.staff-dashboard') }} -
+        {{ config('other.title') }}
+    </title>
 @endsection
 
 @section('meta')
-    <meta name="description" content="User @lang('common.edit') - @lang('staff.staff-dashboard')">
+    <meta
+        name="description"
+        content="User {{ __('common.edit') }} - {{ __('staff.staff-dashboard') }}"
+    />
 @endsection
 
-@section('breadcrumb')
-    <li>
-        <a href="{{ route('users.show', ['username' => $user->username]) }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">{{ $user->username }}</span>
+@section('breadcrumbs')
+    <li class="breadcrumbV2">
+        <a href="{{ route('staff.dashboard.index') }}" class="breadcrumb__link">
+            {{ __('staff.staff-dashboard') }}
         </a>
     </li>
-    <li>
-        <a href="#" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('common.user') @lang('common.edit')</span>
+    <li class="breadcrumbV2">
+        <a href="{{ route('staff.users.index') }}" class="breadcrumb__link">
+            {{ __('common.users') }}
         </a>
+    </li>
+    <li class="breadcrumbV2">
+        <a href="{{ route('users.show', ['user' => $user]) }}" class="breadcrumb__link">
+            {{ $user->username }}
+        </a>
+    </li>
+    <li class="breadcrumb--active">
+        {{ __('common.edit') }}
     </li>
 @endsection
 
-@section('content')
-    <div class="container">
-        <h1 class="title">
-            <i class="{{ config('other.font-awesome') }} fa-gear"></i>
-                @lang('common.edit') @lang('common.user')
-            <a href="{{ route('users.show', ['username' => $user->username]) }}">{{ $user->username }}</a>
-        </h1>
-        <ul class="nav nav-tabs" role="tablist">
-            <li role="presentation" class="active"><a href="#account" aria-controls="account" role="tab" data-toggle="tab"
-                    aria-expanded="true">@lang('common.account')</a></li>
-            <li role="presentation" class=""><a href="#permissions" aria-controls="permissions" role="tab" data-toggle="tab"
-                    aria-expanded="false">@lang('user.id-permissions')</a></li>
-            <li role="presentation" class=""><a href="#notes" aria-controls="notes" role="tab" data-toggle="tab"
-                    aria-expanded="false">@lang('staff.user-notes')</a></li>
-            <li role="presentation" class=""><a href="#password" aria-controls="notes" role="tab" data-toggle="tab"
-                    aria-expanded="false">@lang('user.change-password')</a></li>
-        </ul>
+@section('page', 'page__staff-user--edit')
 
-        <div class="tab-content block block-titled">
-            <div role="tabpanel" class="tab-pane active" id="account">
-                <h3>@lang('common.account')</h3>
-                <hr>
-                <form role="form" method="POST" action="{{ route('user_edit', ['username' => $user->username]) }}">
-                    @csrf
-                    <div class="form-group">
-                        <label for="username">@lang('common.username')</label>
-                        <label>
-                            <input name="username" type="text" value="{{ $user->username }}" class="form-control">
-                        </label>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="email">@lang('common.email')</label>
-                        <label>
-                            <input name="email" type="email" value="{{ $user->email }}" class="form-control">
-                        </label>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="uploaded">@lang('user.total-upload') (Bytes)</label>
-                        <label>
-                            <input name="uploaded" type="number" value="{{ $user->uploaded }}" class="form-control">
-                        </label>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="downloaded">@lang('user.total-download') (Bytes)</label>
-                        <label>
-                            <input name="downloaded" type="number" value="{{ $user->downloaded }}" class="form-control">
-                        </label>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="join-date">@lang('user.member-since')</label>
-                        <label>
-                            <input name="join-date" type="join-date"
-                                value="{{ date('d/m/Y', strtotime($user->created_at)) }}" class="form-control">
-                        </label>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="downloaded">@lang('user.title')</label>
-                        <label>
-                            <input name="title" type="text" value="{{ $user->title }}" class="form-control">
-                        </label>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="about">@lang('user.about-me')</label>
-                        <label>
-                            <textarea name="about" cols="30" rows="10" class="form-control">{{ $user->about }}</textarea>
-                        </label>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="about">@lang('common.group')</label>
-                        <label>
-                            <select name="group_id" class="form-control">
-                                <option value="{{ $user->group->id }}">{{ $user->group->name }} (Default)</option>
-                                @foreach ($groups as $g)
-                                    <option value="{{ $g->id }}">{{ $g->name }}</option>
-                                @endforeach
-                            </select>
-                        </label>
-                    </div>
-                    
-                    @if ($user->group->name == "Internal")
-                        <div class="form-group">
-                            <label for="about">Internal Group:</label>
-                            <label>
-                                <select name="internal_id" class="form-control">
-                                    @if ($user->internal != null)
-                                    <option value="{{ $user->internal->id }}">{{ $user->internal->name }} (Default)</option>
-                                    @endif
-                                    <option value="i0">None</option>
-                                    @foreach ($internals as $i)
-                                        <option value="{{ $i->id }}">{{ $i->name }}</option>
-                                    @endforeach
-                                </select>
-                             </label>
-                        </div>
-                    @endif
-
-                    <button type="submit" class="btn btn-default">@lang('common.save')</button>
-                </form>
-            </div>
-
-            <div role="tabpanel" class="tab-pane" id="permissions">
-                <h3>@lang('user.id-permissions')</h3>
-                <hr>
-                <form role="form" method="POST" action="{{ route('user_permissions', ['username' => $user->username]) }}">
-                    @csrf
-                    <label for="hidden" class="control-label">@lang('user.can-upload')?</label>
-                    <div class="radio-inline">
-                    <label><input type="radio" name="can_upload" @if ($user->can_upload == 1) checked @endif
-                            value="1">@lang('common.yes')</label>
-                    </div>
-                    <div class="radio-inline">
-                    <label><input type="radio" name="can_upload" @if ($user->can_upload == 0) checked @endif
-                            value="0">@lang('common.no')</label>
-                    </div>
-                    <br>
-                    <br>
-                    <label for="hidden" class="control-label">@lang('user.can-download')?</label>
-                    <div class="radio-inline">
-                        <label><input type="radio" name="can_download" @if ($user->can_download == 1) checked
-                            @endif value="1">@lang('common.yes')</label>
-                    </div>
-                    <div class="radio-inline">
-                        <label><input type="radio" name="can_download" @if ($user->can_download == 0) checked
-                            @endif value="0">@lang('common.no')</label>
-                    </div>
-                    <br>
-                    <br>
-                    <label for="hidden" class="control-label">@lang('user.can-comment')?</label>
-                    <div class="radio-inline">
-                    <label><input type="radio" name="can_comment" @if ($user->can_comment == 1) checked @endif
-                            value="1">@lang('common.yes')</label>
-                    </div>
-                    <div class="radio-inline">
-                    <label><input type="radio" name="can_comment" @if ($user->can_comment == 0) checked @endif
-                            value="0">@lang('common.no')</label>
-                    </div>
-                    <br>
-                    <br>
-                    <label for="hidden" class="control-label">@lang('user.can-invite')?</label>
-                    <div class="radio-inline">
-                    <label><input type="radio" name="can_invite" @if ($user->can_invite == 1) checked @endif
-                            value="1">@lang('common.yes')</label>
-                    </div>
-                    <div class="radio-inline">
-                    <label><input type="radio" name="can_invite" @if ($user->can_invite == 0) checked @endif
-                            value="0">@lang('common.no')</label>
-                    </div>
-                    <br>
-                    <br>
-                    <label for="hidden" class="control-label">@lang('user.can-request')?</label>
-                    <div class="radio-inline">
-                    <label><input type="radio" name="can_request" @if ($user->can_request == 1) checked @endif
-                            value="1">@lang('common.yes')</label>
-                    </div>
-                    <div class="radio-inline">
-                    <label><input type="radio" name="can_request" @if ($user->can_request == 0) checked @endif
-                            value="0">@lang('common.no')</label>
-                    </div>
-                    <br>
-                    <br>
-                    <label for="hidden" class="control-label">@lang('user.can-chat')?</label>
-                    <div class="radio-inline">
-                        <label><input type="radio" name="can_chat" @if ($user->can_chat == 1) checked
-                            @endif value="1">@lang('common.yes')</label>
-                    </div>
-                    <div class="radio-inline">
-                        <label><input type="radio" name="can_chat" @if ($user->can_chat == 0) checked
-                            @endif value="0">@lang('common.no')</label>
-                    </div>
-                    <br>
-                    <div class="form-group">
-                        <div class="text-center"><button type="submit" class="btn btn-primary">@lang('common.save')</div>
-                    </div>
-                </form>
-            </div>
-
-            <div role="tabpanel" class="tab-pane" id="notes">
-                <h3>@lang('common.add') @lang('staff.user-notes')</h3>
-                <hr>
-                <form role="form" method="POST" action="{{ route('staff.notes.store', ['username' => $user->username]) }}">
-                    @csrf
-                    <div class="form-group">
-                        <label for="message">@lang('staff.user-notes')</label>
-                        <label>
-                            <textarea name="message" class="form-control"></textarea>
-                        </label>
-                    </div>
-                    <br>
-                    <button type="submit" class="btn btn-primary">@lang('common.save')</button>
-                </form>
-                <hr>
-                <h2>@lang('user.note')<span class="text-blue"><strong><i class="{{ config('other.font-awesome') }} fa-note"></i>
-                            {{ $notes->count() }} </strong></span></h2>
-                <table class="table table-condensed table-striped table-bordered table-hover">
-                    <thead>
-                        <tr>
-                            <th>@lang('common.user')</th>
-                            <th>@lang('common.staff')</th>
-                            <th>@lang('user.note')</th>
-                            <th>@lang('user.created-on')</th>
-                            <th>@lang('common.delete')</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @if (count($notes) == 0)
-                            <p>The are no notes in database for this user!</p>
-                        @else
-                            @foreach ($notes as $note)
-                                <tr>
-                                    <td>
-                                        {{ $note->noteduser->username }}
-                                    </td>
-                                    <td>
-                                        {{ $note->staffuser->username }}
-                                    </td>
-                                    <td>
-                                        {{ $note->message }}
-                                    </td>
-                                    <td>
-                                        {{ $note->created_at->toDayDateTimeString() }} ({{ $note->created_at->diffForHumans() }})
-                                    </td>
-                                    <td>
-                                        <form action="{{ route('staff.notes.destroy', ['id' => $note->id]) }}" method="POST">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-xs btn-danger"><i
-                                                    class="{{ config('other.font-awesome') }} fa-trash"></i></button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        @endif
-                    </tbody>
-                </table>
-            </div>
-
-            <div role="tabpanel" class="tab-pane" id="password">
-                <h3>@lang('user.change-password')</h3>
-                <hr>
-                <form role="form" method="POST" action="{{ route('user_password', ['username' => $user->username]) }}">
-                    @csrf
-                    <div class="form-group">
-                        <label for="new_password">@lang('common.new-adj') @lang('passwords.password')</label>
-                        <label>
-                            <input type="password" name="new_password" class="form-control"
-                                   placeholder="@lang('common.new-adj') @lang('common.password')">
-                        </label>
-                    </div>
-                    <br>
-                    <button type="submit" class="btn btn-primary">@lang('common.save')</button>
-                </form>
-            </div>
+@section('main')
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ __('common.account') }}</h2>
+        <div class="panel__body">
+            <form
+                class="form"
+                method="POST"
+                action="{{ route('staff.users.update', ['user' => $user]) }}"
+            >
+                @csrf
+                @method('PATCH')
+                <p class="form__group">
+                    <input
+                        id="username"
+                        class="form__text"
+                        name="username"
+                        placeholder=" "
+                        required
+                        type="text"
+                        value="{{ $user->username }}"
+                    />
+                    <label class="form__label form__label--floating" for="username">
+                        {{ __('common.username') }}
+                    </label>
+                </p>
+                <p class="form__group">
+                    <input
+                        id="uploaded"
+                        class="form__text"
+                        inputmode="numeric"
+                        name="uploaded"
+                        pattern="[0-9]{1,}"
+                        placeholder=" "
+                        required
+                        type="text"
+                        value="{{ $user->uploaded }}"
+                    />
+                    <label class="form__label form__label--floating" for="uploaded">
+                        {{ __('user.total-upload') }} (Bytes)
+                    </label>
+                </p>
+                <p class="form__group">
+                    <input
+                        id="downloaded"
+                        class="form__text"
+                        inputmode="numeric"
+                        name="downloaded"
+                        pattern="[0-9]{1,}"
+                        placeholder=" "
+                        required
+                        type="text"
+                        value="{{ $user->downloaded }}"
+                    />
+                    <label class="form__label form__label--floating" for="downloaded">
+                        {{ __('user.total-download') }} (Bytes)
+                    </label>
+                </p>
+                <p class="form__group">
+                    <input
+                        id="title"
+                        class="form__text"
+                        name="title"
+                        placeholder=" "
+                        type="text"
+                        value="{{ $user->title }}"
+                    />
+                    <label class="form__label form__label--floating" for="title">
+                        {{ __('user.title') }}
+                    </label>
+                </p>
+                @livewire('bbcode-input', ['name' => 'about', 'label' => __('user.about-me'), 'required' => false, 'content' => $user->about])
+                <p class="form__group">
+                    <select id="group_id" class="form__select" name="group_id">
+                        <option class="form__option" value="{{ $user->group->id }}">
+                            {{ $user->group->name }} (Default)
+                        </option>
+                        @foreach ($groups as $group)
+                            <option class="form__option" value="{{ $group->id }}">
+                                {{ $group->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <label class="form__label form__label--floating" for="group_id">
+                        {{ __('common.group') }}
+                    </label>
+                </p>
+                <p class="form__group">
+                    <input
+                        id="seedbonus"
+                        class="form__text"
+                        inputmode="numeric"
+                        name="seedbonus"
+                        pattern="[0-9]{1,}(?:.[0-9]{1,2})?"
+                        placeholder=" "
+                        required
+                        type="text"
+                        value="{{ $user->seedbonus }}"
+                    />
+                    <label class="form__label form__label--floating" for="seedbonus">
+                        {{ __('bon.bon') }}
+                    </label>
+                </p>
+                <p class="form__group">
+                    <input
+                        id="fl_tokens"
+                        class="form__text"
+                        inputmode="numeric"
+                        name="fl_tokens"
+                        pattern="[0-9]{1,}"
+                        placeholder=" "
+                        required
+                        type="text"
+                        value="{{ $user->fl_tokens }}"
+                    />
+                    <label class="form__label form__label--floating" for="fl_tokens">
+                        {{ __('torrent.freeleech-token') }}
+                    </label>
+                </p>
+                <p class="form__group">
+                    <input
+                        id="invites"
+                        class="form__text"
+                        inputmode="numeric"
+                        name="invites"
+                        pattern="[0-9]{1,}"
+                        placeholder=" "
+                        required
+                        type="text"
+                        value="{{ $user->invites }}"
+                    />
+                    <label class="form__label form__label--floating" for="invites">
+                        {{ __('user.invites') }}
+                    </label>
+                </p>
+                <p class="form__group">
+                    <button class="form__button form__button--filled">
+                        {{ __('common.save') }}
+                    </button>
+                </p>
+            </form>
         </div>
-    </div>
+    </section>
+@endsection
+
+@section('sidebar')
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ __('user.id-permissions') }}</h2>
+        <div class="panel__body">
+            <form
+                class="form"
+                method="POST"
+                action="{{ route('staff.users.update_permissions', ['user' => $user]) }}"
+                x-data="{
+                    override_can_comment: {{ Js::from($user->can_comment !== null) }},
+                    override_can_chat: {{ Js::from($user->can_chat !== null) }},
+                    override_can_invite: {{ Js::from($user->can_invite !== null) }},
+                    override_can_request: {{ Js::from($user->can_request !== null) }},
+                    override_can_upload: {{ Js::from($user->can_upload !== null) }},
+                }"
+            >
+                @csrf
+                @method('PATCH')
+                <p class="form__group">
+                    <input type="hidden" name="can_chat" value="0" />
+                    <input
+                        id="override_can_chat"
+                        class="form__checkbox"
+                        type="checkbox"
+                        x-bind:checked="override_can_chat"
+                        x-model="override_can_chat"
+                    />
+                    <label for="override_can_chat">Override group can chat</label>
+                </p>
+                <div class="form__group" x-show="override_can_chat" x-cloak>
+                    <fieldset class="form__fieldset">
+                        <input
+                            type="hidden"
+                            name="can_chat"
+                            x-bind:value="override_can_chat ? '0' : ''"
+                        />
+                        <input
+                            type="checkbox"
+                            class="form__checkbox"
+                            id="can_chat"
+                            name="can_chat"
+                            value="1"
+                            x-bind:checked="override_can_chat && $el.checked"
+                            @checked($user->can_chat)
+                        />
+                        <label for="can_chat">{{ __('user.can-comment') }}?</label>
+                    </fieldset>
+                </div>
+                <p class="form__group">
+                    <input type="hidden" name="can_comment" value="0" />
+                    <input
+                        id="override_can_comment"
+                        class="form__checkbox"
+                        type="checkbox"
+                        x-bind:checked="override_can_comment"
+                        x-model="override_can_comment"
+                    />
+                    <label for="override_can_comment">Override group can comment</label>
+                </p>
+                <div class="form__group" x-show="override_can_comment" x-cloak>
+                    <fieldset class="form__fieldset">
+                        <input
+                            type="hidden"
+                            name="can_comment"
+                            x-bind:value="override_can_comment ? '0' : ''"
+                        />
+                        <input
+                            type="checkbox"
+                            class="form__checkbox"
+                            id="can_comment"
+                            name="can_comment"
+                            value="1"
+                            x-bind:checked="override_can_comment && $el.checked"
+                            @checked($user->can_comment)
+                        />
+                        <label for="can_comment">{{ __('user.can-comment') }}?</label>
+                    </fieldset>
+                </div>
+                <p class="form__group">
+                    <input
+                        id="override_can_invite"
+                        class="form__checkbox"
+                        type="checkbox"
+                        x-bind:checked="override_can_invite"
+                        x-model="override_can_invite"
+                    />
+                    <label for="override_can_invite">Override group can invite</label>
+                </p>
+                <div class="form__group" x-show="override_can_invite" x-cloak>
+                    <fieldset class="form__fieldset">
+                        <input
+                            type="hidden"
+                            name="can_invite"
+                            x-bind:value="override_can_invite ? '0' : ''"
+                        />
+                        <input
+                            type="checkbox"
+                            class="form__checkbox"
+                            id="can_invite"
+                            name="can_invite"
+                            value="1"
+                            x-bind:checked="override_can_invite && $el.checked"
+                            @checked($user->can_invite)
+                        />
+                        <label for="can_invite">{{ __('user.can-invite') }}?</label>
+                    </fieldset>
+                </div>
+                <p class="form__group">
+                    <input
+                        id="override_can_request"
+                        class="form__checkbox"
+                        type="checkbox"
+                        x-bind:checked="override_can_request"
+                        x-model="override_can_request"
+                    />
+                    <label for="override_can_request">Override group can request</label>
+                </p>
+                <div class="form__group" x-show="override_can_request" x-cloak>
+                    <fieldset class="form__fieldset">
+                        <input
+                            type="hidden"
+                            name="can_request"
+                            x-bind:value="override_can_request ? '0' : ''"
+                        />
+                        <input
+                            type="checkbox"
+                            class="form__checkbox"
+                            id="can_request"
+                            name="can_request"
+                            value="1"
+                            x-bind:checked="override_can_request && $el.checked"
+                            @checked($user->can_request)
+                        />
+                        <label for="can_request">{{ __('user.can-request') }}?</label>
+                    </fieldset>
+                </div>
+                <p class="form__group">
+                    <input
+                        id="override_can_upload"
+                        class="form__checkbox"
+                        type="checkbox"
+                        x-bind:checked="override_can_upload"
+                        x-model="override_can_upload"
+                    />
+                    <label for="override_can_upload">Override group can upload</label>
+                </p>
+                <div class="form__group" x-show="override_can_upload" x-cloak>
+                    <fieldset class="form__fieldset">
+                        <input
+                            type="hidden"
+                            name="can_upload"
+                            x-bind:value="override_can_upload ? '0' : ''"
+                        />
+                        <input
+                            type="checkbox"
+                            class="form__checkbox"
+                            id="can_upload"
+                            name="can_upload"
+                            value="1"
+                            x-bind:checked="override_can_upload && $el.checked"
+                            @checked($user->can_upload)
+                        />
+                        <label for="can_upload">{{ __('user.can-upload') }}?</label>
+                    </fieldset>
+                </div>
+                <p class="form__group">
+                    <input type="hidden" name="is_donor" value="0" />
+                    <input
+                        type="checkbox"
+                        class="form__checkbox"
+                        id="is_donor"
+                        name="is_donor"
+                        value="1"
+                        @checked($user->is_donor)
+                    />
+                    <label for="is_donor">Active donor?</label>
+                </p>
+                <p class="form__group">
+                    <input type="hidden" name="is_lifetime" value="0" />
+                    <input
+                        type="checkbox"
+                        class="form__checkbox"
+                        id="is_lifetime"
+                        name="is_lifetime"
+                        value="1"
+                        @checked($user->is_lifetime)
+                    />
+                    <label for="is_donor">Lifetime donor?</label>
+                </p>
+                <p class="form__group">
+                    <button class="form__button form__button--filled">
+                        {{ __('common.save') }}
+                    </button>
+                </p>
+            </form>
+        </div>
+    </section>
 @endsection

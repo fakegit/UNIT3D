@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -25,34 +28,25 @@ class MessageDeleted implements ShouldBroadcastNow
     use Dispatchable;
     use InteractsWithSockets;
     use SerializesModels;
-    /**
-     * Message details.
-     *
-     * @var Message
-     */
-    public $message;
 
     /**
      * Create a new event instance.
      */
-    public function __construct(Message $message)
+    public function __construct(public Message $message)
     {
-        $this->message = Message::find($message->id);
     }
 
     /**
      * Get the channels the event should broadcast on.
-     *
-     * @return PresenceChannel
      */
-    public function broadcastOn()
+    public function broadcastOn(): PresenceChannel
     {
         // $this->dontBroadcastToCurrentUser();
 
         return new PresenceChannel('chatroom.'.$this->message->chatroom_id);
     }
 
-    public function broadcastAs()
+    public function broadcastAs(): string
     {
         return 'delete.message';
     }

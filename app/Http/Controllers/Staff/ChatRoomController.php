@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,10 +17,11 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Staff\StoreChatRoomRequest;
+use App\Http\Requests\Staff\UpdateChatRoomRequest;
 use App\Models\Chatroom;
 use App\Models\User;
-use App\Repositories\ChatRepository;
-use Illuminate\Http\Request;
+use Exception;
 
 /**
  * @see \Tests\Feature\Http\Controllers\Staff\ChatRoomControllerTest
@@ -25,96 +29,75 @@ use Illuminate\Http\Request;
 class ChatRoomController extends Controller
 {
     /**
-     * ChatController Constructor.
-     */
-    public function __construct(private ChatRepository $chatRepository)
-    {
-    }
-
-    /**
      * Display All Chat Rooms.
      */
     public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $chatrooms = $this->chatRepository->rooms();
-
-        return \view('Staff.chat.room.index', [
-            'chatrooms'    => $chatrooms,
+        return view('Staff.chat.room.index', [
+            'chatrooms' => Chatroom::all(),
         ]);
+    }
+
+    /**
+     * Show Form For Creating A New Chatroom.
+     */
+    public function create(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    {
+        return view('Staff.chat.room.create');
     }
 
     /**
      * Store A New Chatroom.
-     *
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function store(Request $request)
+    public function store(StoreChatRoomRequest $request): \Illuminate\Http\RedirectResponse
     {
-        $chatroom = new Chatroom();
-        $chatroom->name = $request->input('name');
+        Chatroom::create($request->validated());
 
-        $v = \validator($chatroom->toArray(), [
-            'name' => 'required',
+        return to_route('staff.chatrooms.index')
+            ->with('success', 'Chatroom successfully added');
+    }
+
+    /**
+     * Chatroom Edit Form.
+     */
+    public function edit(Chatroom $chatroom): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    {
+        return view('Staff.chat.room.edit', [
+            'chatroom' => $chatroom,
         ]);
-
-        if ($v->fails()) {
-            return \redirect()->route('staff.rooms.index')
-                ->withErrors($v->errors());
-        }
-        $chatroom->save();
-
-        return \redirect()->route('staff.rooms.index')
-            ->withSuccess('Chatroom Successfully Added');
     }
 
     /**
      * Update A Chatroom.
-     *
-     * @param \App\Models\Chatroom $id
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function update(Request $request, $id)
+    public function update(UpdateChatRoomRequest $request, Chatroom $chatroom): \Illuminate\Http\RedirectResponse
     {
-        $chatroom = Chatroom::findOrFail($id);
-        $chatroom->name = $request->input('name');
+        $chatroom->update($request->validated());
 
-        $v = \validator($chatroom->toArray(), [
-            'name' => 'required',
-        ]);
-
-        if ($v->fails()) {
-            return \redirect()->route('staff.rooms.index')
-                ->withErrors($v->errors());
-        }
-        $chatroom->save();
-
-        return \redirect()->route('staff.rooms.index')
-            ->withSuccess('Chatroom Successfully Modified');
+        return to_route('staff.chatrooms.index')
+            ->with('success', 'Chatroom successfully modified');
     }
 
     /**
      * Delete A Chatroom.
      *
-     * @param \App\Models\Chatroom $id
-     *
-     * @throws \Exception
-     *
-     * @return \Illuminate\Http\RedirectResponse
+     * @throws Exception
      */
-    public function destroy($id)
+    public function destroy(Chatroom $chatroom): \Illuminate\Http\RedirectResponse
     {
-        $chatroom = Chatroom::findOrFail($id);
-        $users = User::where('chatroom_id', '=', $id)->get();
-        $default = Chatroom::where('name', '=', \config('chat.system_chatroom'))->pluck('id');
-        foreach ($users as $user) {
-            $user->chatroom_id = $default[0];
-            $user->save();
-        }
+        $default = Chatroom::query()
+            ->when(
+                \is_int(config('chat.system_chatroom')),
+                fn ($query) => $query->where('id', '=', config('chat.system_chatroom')),
+                fn ($query) => $query->where('name', '=', config('chat.system_chatroom')),
+            )
+            ->soleValue('id');
+
+        User::whereBelongsTo($chatroom)->update(['chatroom_id' => $default]);
+
         $chatroom->delete();
 
-        return \redirect()->route('staff.rooms.index')
-            ->withSuccess('Chatroom Successfully Deleted');
+        return to_route('staff.chatrooms.index')
+            ->with('success', 'Chatroom successfully deleted');
     }
 }

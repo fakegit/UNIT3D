@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,8 +16,11 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\ApplicationImageProof.
@@ -24,26 +30,19 @@ use Illuminate\Database\Eloquent\Model;
  * @property string                          $image
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\Application $application
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ApplicationImageProof newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ApplicationImageProof newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ApplicationImageProof query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ApplicationImageProof whereApplicationId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ApplicationImageProof whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ApplicationImageProof whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ApplicationImageProof whereImage($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ApplicationImageProof whereUpdatedAt($value)
- * @mixin \Eloquent
  */
-class ApplicationImageProof extends Model
+#[AllowDynamicProperties]
+final class ApplicationImageProof extends Model
 {
+    use Auditable;
+
+    /** @use HasFactory<\Database\Factories\ApplicationImageProofFactory> */
     use HasFactory;
 
     /**
-     * The Attributes That Are Mass Assignable.
+     * The attributes that are mass assignable.
      *
-     * @var array
+     * @var list<string>
      */
     protected $fillable = [
         'application_id',
@@ -51,11 +50,11 @@ class ApplicationImageProof extends Model
     ];
 
     /**
-     * Belongs To A Application.
+     * Get the application that owns the image proof.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Application, $this>
      */
-    public function application()
+    public function application(): BelongsTo
     {
         return $this->belongsTo(Application::class);
     }

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,8 +16,8 @@
 
 namespace App\Helpers;
 
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Exception;
 
 class SystemInformation
 {
@@ -33,119 +36,169 @@ class SystemInformation
         'sqlsrv',
     ];
 
-    public function avg()
+    /**
+     * @return null|array{
+     *     '1-minute': string,
+     *     '5-minute': string,
+     *     '15-minute': string,
+     * }
+     */
+    public function avg(): ?array
     {
-        if (\is_readable('/proc/loadavg')) {
-            return (float) \file_get_contents('/proc/loadavg');
-        }
-    }
+        // cspell:ignore loadavg
+        if (is_readable('/proc/loadavg')) {
+            $file = file_get_contents('/proc/loadavg');
 
-    public function memory()
-    {
-        if (\is_readable('/proc/meminfo')) {
-            $content = \file_get_contents('/proc/meminfo');
-            \preg_match('#^MemTotal: \s*(\d*)#m', $content, $matches);
-            $total = $matches[1] * 1_024;
-            \preg_match('#^MemFree: \s*(\d*)#m', $content, $matches);
-            $free = $matches[1] * 1_024;
-            //preg_match('/^MemAvailable: \s*(\d*)/m', $content, $matches);
-            //$used = $this->formatBytes($matches[1] * 1024);
+            if ($file === false) {
+                return null;
+            }
+
+            $loads = explode(' ', $file);
 
             return [
-                'total' => $this->formatBytes($total),
-                'free'  => $this->formatBytes($free),
-                'used'  => $this->formatBytes($total - $free),
+                '1-minute'  => $loads[0],
+                '5-minute'  => $loads[1],
+                '15-minute' => $loads[2],
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return null|array{
+     *     total: string,
+     *     available: string,
+     *     used: string,
+     * }
+     */
+    public function memory(): ?array
+    {
+        if (is_readable('/proc/meminfo')) {
+            $content = file_get_contents('/proc/meminfo');
+
+            if ($content === false) {
+                return null;
+            }
+
+            preg_match('#^MemTotal: \s*(\d*)#m', $content, $matches);
+            $total = ((int) $matches[1]) * 1_024;
+            preg_match('/^MemAvailable: \s*(\d*)/m', $content, $matches);
+            $available = ((int) $matches[1]) * 1_024;
+
+            return [
+                'total'     => $this->formatBytes($total),
+                'available' => $this->formatBytes($available),
+                'used'      => $this->formatBytes($total - $available),
             ];
         }
 
         return [
-            'total' => 0,
-            'free'  => 0,
-            'used'  => 0,
+            'total'     => '0',
+            'available' => '0',
+            'used'      => '0',
         ];
     }
 
-    protected function formatBytes($bytes, $precision = 2)
+    protected function formatBytes(int|float $bytes, int $precision = 2): string
     {
-        $bytes = \max($bytes, 0);
-        $pow = \floor(($bytes ? \log($bytes) : 0) / \log(1_024));
-        $pow = \min($pow, (\is_countable(self::UNITS) ? \count(self::UNITS) : 0) - 1);
+        $bytes = max($bytes, 0);
+        $pow = (int) floor(($bytes ? log($bytes) : 0) / log(1_024));
+        $pow = min($pow, (\count(self::UNITS)) - 1);
         // Uncomment one of the following alternatives
         $bytes /= 1_024 ** $pow;
         // $bytes /= (1 << (10 * $pow));
 
-        return \round($bytes, $precision).' '.self::UNITS[$pow];
+        return round($bytes, $precision).' '.self::UNITS[$pow];
     }
 
-    public function disk()
+    /**
+     * @return array{
+     *     total: string,
+     *     free: string,
+     *     used: string,
+     * }
+     */
+    public function disk(): array
     {
-        $total = \disk_total_space(\base_path());
-        $free = \disk_free_space(\base_path());
+        $total = disk_total_space(base_path());
+        $free = disk_free_space(base_path());
 
         return [
-            'total' => $this->formatBytes($total),
-            'free'  => $this->formatBytes($free),
-            'used'  => $this->formatBytes($total - $free),
+            'total' => $this->formatBytes($total ?: 0),
+            'free'  => $this->formatBytes($free ?: 0),
+            'used'  => $this->formatBytes(($total ?: 0) - ($free ?: 0)),
         ];
     }
 
-    public function uptime()
+    public function uptime(): ?float
     {
-        if (\is_readable('/proc/uptime')) {
-            return (float) \file_get_contents('/proc/uptime');
+        if (is_readable('/proc/uptime')) {
+            return (float) file_get_contents('/proc/uptime');
         }
+
+        return null;
     }
 
-    public function systemTime(): Carbon
-    {
-        return Carbon::now();
-    }
-
-    public function basic()
+    /**
+     * @return array{
+     *     os: string,
+     *     php: string,
+     *     database: string,
+     *     laravel: string,
+     * }
+     */
+    public function basic(): array
     {
         return [
             'os'       => PHP_OS,
             'php'      => PHP_VERSION,
             'database' => $this->getDatabase(),
-            'laravel'  => \app()->version(),
+            'laravel'  => app()->version(),
         ];
     }
 
-    private function getDatabase()
+    private function getDatabase(): string
     {
-        if (! \in_array(\config('database.default'), self::KNOWN_DATABASES, true)) {
-            return 'Unkown';
+        if (!\in_array(config('database.default'), self::KNOWN_DATABASES, true)) {
+            return 'Unknown';
         }
-        $results = DB::select(DB::raw('select version()'));
 
-        return $results[0]->{'version()'};
+        return DB::select('select version()')[0]->{'version()'};
     }
 
     /**
      * Get all the directory permissions as well as the recommended ones.
      *
-     * @return array
+     * @return array<
+     *     int,
+     *     array{
+     *         directory: string,
+     *         permission: string,
+     *         recommended: string,
+     *     }
+     * >
      */
-    public function directoryPermissions()
+    public function directoryPermissions(): array
     {
         return [
             [
-                'directory'   => \base_path('bootstrap/cache'),
+                'directory'   => base_path('bootstrap/cache'),
                 'permission'  => $this->getDirectoryPermission('bootstrap/cache'),
                 'recommended' => '0775',
             ],
             [
-                'directory'   => \base_path('public'),
+                'directory'   => base_path('public'),
                 'permission'  => $this->getDirectoryPermission('public'),
                 'recommended' => '0775',
             ],
             [
-                'directory'   => \base_path('storage'),
+                'directory'   => base_path('storage'),
                 'permission'  => $this->getDirectoryPermission('storage'),
                 'recommended' => '0775',
             ],
             [
-                'directory'   => \base_path('vendor'),
+                'directory'   => base_path('vendor'),
                 'permission'  => $this->getDirectoryPermission('vendor'),
                 'recommended' => '0775',
             ],
@@ -154,15 +207,13 @@ class SystemInformation
 
     /**
      * Get the file permissions for a specific path/file.
-     *
-     * @param $path
      */
-    public function getDirectoryPermission($path): string|\Symfony\Component\Translation\TranslatorInterface
+    private function getDirectoryPermission(string $path): string
     {
         try {
-            return \substr(\sprintf('%o', \fileperms(\base_path($path))), -4);
-        } catch (\Exception) {
-            return \trans('site.error');
+            return substr(\sprintf('%o', fileperms(base_path($path))), -4);
+        } catch (Exception) {
+            return trans('site.error');
         }
     }
 }

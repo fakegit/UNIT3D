@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,46 +16,51 @@
 
 namespace App\Http\Resources;
 
-use andkab\LaravelJoyPixels\LaravelJoyPixels;
 use App\Helpers\Bbcode;
+use hdvinnie\LaravelJoyPixels\LaravelJoyPixels;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * @mixin \App\Models\Message
+ */
 class ChatMessageResource extends JsonResource
 {
     /**
      * Transform the resource into an array.
      *
-     * @param \Illuminate\Http\Request $request
-     *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      *
-     * @return array
+     * @return array{
+     *     id: int,
+     *     bot: BotResource,
+     *     user: ChatUserResource,
+     *     receiver: ChatUserResource,
+     *     chatroom: ChatRoomResource,
+     *     message: string,
+     *     created_at: string,
+     *     updated_at: string,
+     * }
      */
-    public function toArray($request)
+    public function toArray(Request $request): array
     {
-        $emojiOne = \app()->make(LaravelJoyPixels::class);
+        $emojiOne = new LaravelJoyPixels();
 
-        $logger = null;
-        if ($this->user_id && $this->user_id == 1) {
-            $bbcode = new Bbcode();
-            $logger = $bbcode->parse('<div class="align-left"><div class="chatTriggers">'.$this->message.'</div></div>');
-            $logger = $emojiOne->toImage($logger);
-            $logger = \str_replace('a href="/#', 'a trigger="bot" class="chatTrigger" href="/#', $logger);
-            $logger = \htmlspecialchars_decode($logger);
-        } else {
-            $bbcode = new Bbcode();
-            $logger = $bbcode->parse('<div class="align-left">'.$this->message.'</div>');
-            $logger = $emojiOne->toImage($logger);
-            $logger = \htmlspecialchars_decode($logger);
+        $bbcode = new Bbcode();
+        $logger = $bbcode->parse($this->message);
+        $logger = $emojiOne->toImage($logger);
+
+        if ($this->user_id == 1) {
+            $logger = str_replace('a href="/#', 'a trigger="bot" class="chatTrigger" href="/#', $logger);
         }
 
         return [
             'id'         => $this->id,
             'bot'        => new BotResource($this->whenLoaded('bot')),
-            'user'       => new UserResource($this->whenLoaded('user')),
-            'receiver'   => new UserResource($this->whenLoaded('receiver')),
+            'user'       => new ChatUserResource($this->whenLoaded('user')),
+            'receiver'   => new ChatUserResource($this->whenLoaded('receiver')),
             'chatroom'   => new ChatRoomResource($this->whenLoaded('chatroom')),
-            'message'    => \clean($logger),
+            'message'    => $logger,
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),
         ];

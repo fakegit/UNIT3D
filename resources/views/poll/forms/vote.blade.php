@@ -1,43 +1,51 @@
-<form class="form-horizontal" method="POST" action="/polls/vote">
+<form
+    class="form-horizontal"
+    method="POST"
+    action="{{ route('polls.votes.store', ['poll' => $poll]) }}"
+>
     @csrf
-    @if (count($errors) > 0)
-        <div class="alert alert-danger">
-            <ul>
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
-
-    {!! csrf_field() !!}
-
     @if ($poll->multiple_choice)
         @foreach ($poll->options as $option)
-            <div class="poll-item">
-                <label>
-                    <input type="checkbox" name="option[]" value="{{ $option->id }}">
-                    <span class="badge-user">{{ $option->name }}</span>
+            <p class="form__group">
+                <input
+                    id="option{{ $option->id }}"
+                    class="form__checkbox"
+                    type="checkbox"
+                    name="options[]"
+                    value="{{ $option->id }}"
+                />
+                <label class="form__label" for="option{{ $option->id }}">
+                    {{ $option->name }}
                 </label>
-            </div>
+            </p>
         @endforeach
     @else
         @foreach ($poll->options as $option)
-            <div class="poll-item">
-                <label>
-                    <input type="radio" name="option[]" value="{{ $option->id }}" required>
-                    <span class="badge-user">{{ $option->name }}</span>
+            <p class="form__group">
+                <input
+                    id="option{{ $option->id }}"
+                    class="form__radio"
+                    type="radio"
+                    name="options[]"
+                    value="{{ $option->id }}"
+                    required
+                />
+                <label class="form__label" for="option{{ $option->id }}">
+                    {{ $option->name }}
                 </label>
-            </div>
+            </p>
         @endforeach
     @endif
-
-    <div class="poll form-group">
-        <div class="col-md-12">
-            <button type="submit" class="btn btn-primary">@lang('poll.vote')</button>
-            <a class="btn btn-success" href="{{ route('poll_results', ['id' => $poll->id]) }}" role="button"><i
-                        class="{{ config('other.font-awesome') }} fa-bar-chart"
-                        aria-hidden="true"> @lang('poll.results')</i></a>
-        </div>
-    </div>
+    <p class="form__group">
+        <button class="form__button form__button--filled">
+            {{ __('poll.vote') }}
+        </button>
+        <a
+            class="form__button form__button--outlined"
+            href="{{ route('polls.votes.index', ['poll' => $poll]) }}"
+        >
+            <i class="{{ config('other.font-awesome') }} fa-chart-bar"></i>
+            {{ __('poll.results') }}
+        </a>
+    </p>
 </form>

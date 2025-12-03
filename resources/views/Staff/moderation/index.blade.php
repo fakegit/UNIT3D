@@ -1,454 +1,302 @@
-@extends('layout.default')
+@extends('layout.with-main')
 
 @section('title')
-    <title>Moderation - @lang('staff.staff-dashboard') - {{ config('other.title') }}</title>
+    <title>Moderation - {{ __('staff.staff-dashboard') }} - {{ config('other.title') }}</title>
 @endsection
 
-@section('breadcrumb')
-    <li>
-        <a href="{{ route('staff.dashboard.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('staff.staff-dashboard')</span>
+@section('breadcrumbs')
+    <li class="breadcrumbV2">
+        <a href="{{ route('staff.dashboard.index') }}" class="breadcrumb__link">
+            {{ __('staff.staff-dashboard') }}
         </a>
     </li>
-    <li class="active">
-        <a href="{{ route('staff.moderation.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('staff.torrent-moderation')</span>
-        </a>
+    <li class="breadcrumb--active">
+        {{ __('staff.torrent-moderation') }}
     </li>
 @endsection
 
-@section('content')
-    <div class="container box">
-        <div class="table-responsive">
-            <table class="table table-condensed table-striped table-bordered">
+@section('page', 'page__staff-moderation--index')
+
+@section('main')
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ __('common.pending-torrents') }}</h2>
+        <div class="data-table-wrapper">
+            <table class="data-table">
                 <thead>
-                <tr>
-                    <th>@lang('torrent.uploaded')</th>
-                    <th>@lang('common.name')</th>
-                    <th>@lang('common.category')</th>
-                    <th>@lang('common.type')</th>
-                    <th>@lang('common.resolution')</th>
-                    <th>@lang('torrent.size')</th>
-                    <th>@lang('torrent.uploader')</th>
-                    <th>@lang('common.moderation-approve')</th>
-                    <th>@lang('common.moderation-postpone')</th>
-                    <th>@lang('common.moderation-reject')</th>
-                </tr>
+                    <tr>
+                        <th>{{ __('torrent.uploaded') }}</th>
+                        <th>{{ __('common.name') }}</th>
+                        <th>{{ __('common.category') }}</th>
+                        <th>{{ __('common.type') }}</th>
+                        <th>{{ __('common.resolution') }}</th>
+                        <th>{{ __('torrent.size') }}</th>
+                        <th>{{ __('torrent.uploader') }}</th>
+                        <th>{{ __('common.action') }}</th>
+                    </tr>
                 </thead>
                 <tbody>
-                @foreach ($pending as $p)
-                    <tr>
-                        <td><span class="text-red text-bold">{{ $p->created_at->diffForHumans() }}</span></td>
-                        <td><a href="{{ route('torrent', ['id' => $p->id]) }}" itemprop="url"
-                               class="l-breadcrumb-item-link"><span itemprop="title"
-                                                                    class="l-breadcrumb-item-link-title">{{ $p->name }}</span></a>
-                        </td>
-                        <td><i class="{{ $p->category->icon }} torrent-icon" data-toggle="tooltip"
-                               data-original-title="{{ $p->category->name }} Torrent"></i></td>
-                        <td>{{ $p->type->name }}</td>
-                        <td>{{ $p->resolution->name ?? 'No Res' }}</td>
-                        <td>{{ $p->getSize() }}</td>
-                        <td><a href="{{ route('users.show', ['username' => $p->user->username]) }}"
-                               itemprop="url" class="l-breadcrumb-item-link"><span itemprop="title"
-                                                                                   class="l-breadcrumb-item-link-title">{{ $p->user->username }}
-                                    ({{ $p->user->group->name }})</span></a></td>
-                        <td><a href="{{ route('staff.moderation.approve', ['id' => $p->id]) }}" role='button'
-                               class='btn btn-labeled btn-success'>
-                                <span class="btn-label">
-                                    <i class="{{ config('other.font-awesome') }} fa-thumbs-up"></i>
-                                </span>
-                                @lang('common.moderation-approve')
-                            </a></td>
-                        <td>
-                            <button data-target="#pendpostpone-{{ $p->id }}" data-toggle="modal" class="btn btn-labeled btn-danger">
-                                <span class="btn-label"><i class="{{ config('other.font-awesome') }} fa-pause"></i></span>
-                                @lang('common.moderation-postpone')
-                            </button>
-
-                            <div class="modal fade" id="pendpostpone-{{ $p->id }}" tabindex="-1" role="dialog"
-                                 aria-hidden="true">
-                                <form method="POST" action="{{ route('staff.moderation.postpone') }}">
-                                    @csrf
-                                    <div class="modal-dialog{{ \modal_style() }}">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <button type="button" class="close" data-dismiss="modal"
-                                                        aria-label="@lang('common.close')"><span aria-hidden="true">×</span>
-                                                </button>
-                                                <h4 class="modal-title" id="myModalLabel">
-                                                    @lang('common.moderation-postpone') @lang('torrent.torrent'): {{ $p->name }}
-                                                </h4>
-                                            </div>
-                                            <div class="modal-body">
-                                                <div class="form-group">
-                                                    <input id="type" name="type" type="hidden"
-                                                           value="@lang('torrent.torrent')">
-                                                    <input id="id" name="id" type="hidden" value="{{ $p->id }}">
-                                                    <input id="slug" name="slug" type="hidden" value="{{ $p->slug }}">
-                                                    <label for="postpone_reason"
-                                                           class="col-sm-2 control-label">@lang('common.reason')</label>
-                                                    <div class="col-sm-10">
-                                                        <label for="message"></label>
-                                                        <textarea title="Postpone message" class="form-control" rows="5" name="message" cols="50" id="message"></textarea>
-                                                    </div>
-                                                </div>
-                                                <div class="form-group">
-                                                    <div class="col-sm-10 col-sm-offset-2">
-                                                        <button class="btn btn-danger" type="submit">
-                                                            @lang('common.moderation-postpone')
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button class="btn btn-sm btn-primary"
-                                                        data-dismiss="modal">@lang('common.close')</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </form>
-                            </div>
-                        </td>
-                        <td>
-                            <button data-target="#pendreject-{{ $p->id }}" data-toggle="modal" class="btn btn-labeled btn-danger">
-                                <span class="btn-label">
-                                    <i class="{{ config('other.font-awesome') }} fa-thumbs-down"></i>
-                                </span>
-                                @lang('common.moderation-reject')
-                            </button>
-                            <div class="modal fade" id="pendreject-{{ $p->id }}" tabindex="-1" role="dialog" aria-hidden="true">
-                                <form method="POST" action="{{ route("staff.moderation.reject") }}">
-                                    @csrf
-                                    <div class="modal-dialog{{ \modal_style() }}">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <button type="button" class="close" data-dismiss="modal"
-                                                        aria-label="@lang('common.close')"><span aria-hidden="true">×</span>
-                                                </button>
-                                                <h4 class="modal-title" id="myModalLabel">
-                                                    @lang('common.moderation-reject') @lang('torrent.torrent'): {{ $p->name }}
-                                                </h4>
-                                            </div>
-                                            <div class="modal-body">
-                                                <div class="form-group">
-                                                    <input id="type" type="hidden" name="type"
-                                                           value="@lang('torrent.torrent')">
-                                                    <input id="id" type="hidden" name="id" value="{{ $p->id }}">
-                                                    <input id="slug" type="hidden" name="slug" value="{{ $p->slug }}">
-                                                    <label for="file_name" class="col-sm-2 control-label">@lang('torrent.torrent')</label>
-                                                    <div class="col-sm-10">
-                                                        <p id="title" name="title" class="form-control-static">{{ $p->name }}</p>
-                                                    </div>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label for="report_reason"
-                                                           class="col-sm-2 control-label">@lang('common.reason')</label>
-                                                    <div class="col-sm-10">
-                                                        <label for="message"></label>
-                                                        <textarea title="Rejection Message" class="form-control" rows="5" name="message" cols="50" id="message"></textarea>
-                                                    </div>
-                                                </div>
-                                                <div class="form-group">
-                                                    <div class="col-sm-10 col-sm-offset-2">
-                                                        <button class="btn btn-danger" type="submit">
-                                                            @lang('common.moderation-reject')
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button class="btn btn-sm btn-primary"
-                                                        data-dismiss="modal">@lang('common.close')</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                @endforeach
+                    @forelse ($pending as $torrent)
+                        <tr>
+                            <td>
+                                <time
+                                    datetime="{{ $torrent->created_at }}"
+                                    title="{{ $torrent->created_at }}"
+                                >
+                                    {{ $torrent->created_at->diffForHumans() }}
+                                </time>
+                            </td>
+                            <td>
+                                <a href="{{ route('torrents.show', ['id' => $torrent->id]) }}">
+                                    {{ $torrent->name }}
+                                </a>
+                            </td>
+                            <td>
+                                <i
+                                    class="{{ $torrent->category->icon }} category__icon"
+                                    data-original-title="{{ $torrent->category->name }} torrent"
+                                ></i>
+                            </td>
+                            <td>{{ $torrent->type->name }}</td>
+                            <td>{{ $torrent->resolution->name ?? 'No res' }}</td>
+                            <td>{{ $torrent->getSize() }}</td>
+                            <td>
+                                <x-user-tag :anon="false" :user="$torrent->user" />
+                            </td>
+                            <td>
+                                <menu class="data-table__actions">
+                                    <li class="data-table__action">
+                                        <form
+                                            method="POST"
+                                            action="{{ route('staff.moderation.update', ['id' => $torrent->id]) }}"
+                                        >
+                                            @csrf
+                                            <input
+                                                type="hidden"
+                                                name="old_status"
+                                                value="{{ $torrent->status }}"
+                                            />
+                                            <input
+                                                type="hidden"
+                                                name="status"
+                                                value="{{ \App\Enums\ModerationStatus::APPROVED }}"
+                                            />
+                                            <button class="form__button form__button--filled">
+                                                <i
+                                                    class="{{ config('other.font-awesome') }} fa-thumbs-up"
+                                                ></i>
+                                                {{ __('common.moderation-approve') }}
+                                            </button>
+                                        </form>
+                                    </li>
+                                    @include('Staff.moderation.partials._postpone-dialog', ['torrent' => $torrent])
+                                    @include('Staff.moderation.partials._reject-dialog', ['torrent' => $torrent])
+                                </menu>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8">No pending torrents</td>
+                        </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
-        </div>
-
-    <div class="text-center"><h1>@lang('torrent.postponed-torrents')</h1></div>
-    <div class="container box">
-        <div class="table-responsive">
-            <table class="table table-condensed table-striped table-bordered">
+    </section>
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ __('torrent.postponed-torrents') }}</h2>
+        <div class="data-table-wrapper">
+            <table class="data-table">
                 <thead>
-                <tr>
-                    <th>@lang('staff.moderation-since')</th>
-                    <th>@lang('common.name')</th>
-                    <th>@lang('common.category')</th>
-                    <th>@lang('common.type')</th>
-                    <th>@lang('common.resolution')</th>
-                    <th>@lang('torrent.size')</th>
-                    <th>@lang('torrent.uploader')</th>
-                    <th>@lang('common.staff')</th>
-                    <th>@lang('common.moderation-approve')</th>
-                    <th>@lang('common.edit')</th>
-                    <th>@lang('common.delete')</th>
-                </tr>
+                    <tr>
+                        <th>{{ __('staff.moderation-since') }}</th>
+                        <th>{{ __('common.name') }}</th>
+                        <th>{{ __('common.category') }}</th>
+                        <th>{{ __('common.type') }}</th>
+                        <th>{{ __('common.resolution') }}</th>
+                        <th>{{ __('torrent.size') }}</th>
+                        <th>{{ __('torrent.uploader') }}</th>
+                        <th>{{ __('common.staff') }}</th>
+                        <th>{{ __('common.action') }}</th>
+                    </tr>
                 </thead>
                 <tbody>
-                @foreach ($postponed as $post)
-                    <tr>
-                        <td><span class="text-red text-bold">{{ $post->moderated_at->diffForHumans() }}</span></td>
-                        <td><a href="{{ route('torrent', ['id' => $post->id]) }}" itemprop="url"
-                               class="l-breadcrumb-item-link"><span itemprop="title"
-                                                                    class="l-breadcrumb-item-link-title">{{ $post->name }}</span></a>
-                        </td>
-                        <td><i class="{{ $post->category->icon }} torrent-icon" data-toggle="tooltip"
-                               data-original-title="{{ $post->category->name }} Torrent"></i></td>
-                        <td>{{ $post->type->name }}</td>
-                        <td>{{ $post->resolution->name ?? 'No Res' }}</td>
-                        <td>{{ $post->getSize() }}</td>
-                        <td>
-                            <a href="{{ route('users.show', ['username' => $post->user->username]) }}"
-                               itemprop="url" class="l-breadcrumb-item-link"><span itemprop="title"
-                                                                                   class="l-breadcrumb-item-link-title">{{ $post->user->username }}
-                                    ({{ $post->user->group->name }})</span></a></td>
-                        <td>
-                            <a href="{{ route('users.show', ['username' => $post->moderated->username]) }}"
-                               itemprop="url" class="l-breadcrumb-item-link"><span itemprop="title"
-                                                                                   class="l-breadcrumb-item-link-title">{{ $post->moderated->username }}
-                                    ({{ $post->moderated->group->name }})</span></a></td>
-                        <td><a href="{{ route('staff.moderation.approve', ['id' => $post->id]) }}" role='button'
-                               class='btn btn-labeled btn-success'>
-                                <span class="btn-label">
-                                    <i class="{{ config('other.font-awesome') }} fa-thumbs-up"></i>
-                                </span>
-                                @lang('common.moderation-approve')
-                            </a></td>
-                        <td><a href="{{ route('edit', ['id' => $post->id]) }}" role='button'
-                               class='btn btn-labeled btn-info'><span class="btn-label"><i
-                                            class="{{ config('other.font-awesome') }} fa-pencil"></i></span>@lang('common.edit')</a></td>
-                        <td>
-                            <button data-target="#postdelete-{{ $post->id }}" data-toggle="modal"
-                                    class="btn btn-labeled btn-danger"><span class="btn-label"><i
-                                            class="{{ config('other.font-awesome') }} fa-thumbs-down"></i></span>@lang('common.delete')
-                            </button>
-
-                            <div class="modal fade" id="postdelete-{{ $post->id }}" tabindex="-1" role="dialog"
-                                 aria-hidden="true">
-                                <form method="POST" action="{{ route('delete') }}">
-                                    @csrf
-                                    <div class="modal-dialog{{ \modal_style() }}">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <button type="button" class="close" data-dismiss="modal"
-                                                        aria-label="@lang('common.close')"><span aria-hidden="true">×</span>
-                                                </button>
-                                                <h4 class="modal-title" id="myModalLabel">
-                                                    @lang('common.delete') @lang('torrent.torrent'): {{ $post->name }}
-                                                </h4>
-                                            </div>
-                                            <div class="modal-body">
-                                                <div class="form-group">
-                                                    <input id="type" type="hidden" name="type"
-                                                           value="@lang('torrent.torrent')">
-                                                    <input id="id" type="hidden" name="id" value="{{ $post->id }}">
-                                                    <input id="slug" type="hidden" name="slug" value="{{ $post->slug }}">
-                                                    <label for="file_name"
-                                                           class="col-sm-2 control-label">@lang('torrent.torrent')</label>
-                                                    <div class="col-sm-10">
-                                                        <p id="title" name="title" class="form-control-static">{{ $post->name }}</p>
-                                                    </div>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label for="report_reason"
-                                                           class="col-sm-2 control-label">@lang('common.reason')</label>
-                                                    <div class="col-sm-10">
-                                                        <label for="message"></label>
-                                                        <textarea title="Deletion message" class="form-control" rows="5" name="message" cols="50" id="message"></textarea>
-                                                    </div>
-                                                </div>
-                                                <div class="form-group">
-                                                    <div class="col-sm-10 col-sm-offset-2">
-                                                        <button class="btn btn-danger" type="submit">@lang('common.delete')</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button class="btn btn-sm btn-primary"
-                                                        data-dismiss="modal">@lang('common.close')</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                @endforeach
+                    @forelse ($postponed as $torrent)
+                        <tr>
+                            <td>
+                                <time
+                                    datetime="{{ $torrent->moderated_at }}"
+                                    title="{{ $torrent->moderated_at }}"
+                                >
+                                    {{ $torrent->moderated_at->diffForHumans() }}
+                                </time>
+                            </td>
+                            <td>
+                                <a href="{{ route('torrents.show', ['id' => $torrent->id]) }}">
+                                    {{ $torrent->name }}
+                                </a>
+                            </td>
+                            <td>
+                                <i
+                                    class="{{ $torrent->category->icon }} category__icon"
+                                    title="{{ $torrent->category->name }} torrent"
+                                ></i>
+                            </td>
+                            <td>{{ $torrent->type->name }}</td>
+                            <td>{{ $torrent->resolution->name ?? 'No res' }}</td>
+                            <td>{{ $torrent->getSize() }}</td>
+                            <td>
+                                <x-user-tag :anon="false" :user="$torrent->user" />
+                            </td>
+                            <td>
+                                <x-user-tag :anon="false" :user="$torrent->moderated" />
+                            </td>
+                            <td>
+                                <menu class="data-table__actions">
+                                    <li class="data-table__action">
+                                        <form
+                                            method="POST"
+                                            action="{{ route('staff.moderation.update', ['id' => $torrent->id]) }}"
+                                        >
+                                            @csrf
+                                            <input
+                                                type="hidden"
+                                                name="old_status"
+                                                value="{{ $torrent->status }}"
+                                            />
+                                            <input
+                                                type="hidden"
+                                                name="status"
+                                                value="{{ \App\Enums\ModerationStatus::APPROVED }}"
+                                            />
+                                            <button class="form__button form__button--filled">
+                                                <i
+                                                    class="{{ config('other.font-awesome') }} fa-thumbs-up"
+                                                ></i>
+                                                {{ __('common.moderation-approve') }}
+                                            </button>
+                                        </form>
+                                    </li>
+                                    <li class="data-table__action">
+                                        <a
+                                            href="{{ route('torrents.edit', ['id' => $torrent->id]) }}"
+                                            class="form__button form__button--filled"
+                                        >
+                                            <i
+                                                class="{{ config('other.font-awesome') }} fa-pencil"
+                                            ></i>
+                                            {{ __('common.edit') }}
+                                        </a>
+                                    </li>
+                                    @include('Staff.moderation.partials._delete-dialog', ['torrent' => $torrent])
+                                </menu>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="9">No postponed torrents</td>
+                        </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
-        </div>
-
-    <div class="text-center"><h1>@lang('torrent.rejected')</h1></div>
-    <div class="container box">
-        <div class="table-responsive">
-            <table class="table table-condensed table-striped table-bordered">
+    </section>
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ __('torrent.rejected') }}</h2>
+        <div class="data-table-wrapper">
+            <table class="data-table">
                 <thead>
-                <tr>
-                    <th>@lang('staff.moderation-since')</th>
-                    <th>@lang('common.name')</th>
-                    <th>@lang('common.category')</th>
-                    <th>@lang('common.type')</th>
-                    <th>@lang('common.resolution')</th>
-                    <th>@lang('torrent.size')</th>
-                    <th>@lang('torrent.uploader')</th>
-                    <th>@lang('common.staff')</th>
-                    <th>@lang('common.moderation-approve')</th>
-                    <th>@lang('common.moderation-postpone')</th>
-                    <th>@lang('common.edit')</th>
-                    <th>@lang('common.delete')</th>
-                </tr>
+                    <tr>
+                        <th>{{ __('staff.moderation-since') }}</th>
+                        <th>{{ __('common.name') }}</th>
+                        <th>{{ __('common.category') }}</th>
+                        <th>{{ __('common.type') }}</th>
+                        <th>{{ __('common.resolution') }}</th>
+                        <th>{{ __('torrent.size') }}</th>
+                        <th>{{ __('torrent.uploader') }}</th>
+                        <th>{{ __('common.staff') }}</th>
+                        <th>{{ __('common.action') }}</th>
+                    </tr>
                 </thead>
                 <tbody>
-                @foreach ($rejected as $reject)
-                    <tr>
-                        <td><span class="text-red text-red">{{ $reject->moderated_at->diffForHumans() }}</span></td>
-                        <td><a href="{{ route('torrent', ['id' => $reject->id]) }}"
-                               itemprop="url" class="l-breadcrumb-item-link"><span itemprop="title"
-                                                                                   class="l-breadcrumb-item-link-title">{{ $reject->name }}</span></a>
-                        </td>
-                        <td><i class="{{ $reject->category->icon }} torrent-icon" data-toggle="tooltip"
-                               data-original-title="{{ $reject->category->name }} Torrent"></i></td>
-                        <td>{{ $reject->type->name }}</td>
-                        <td>{{ $reject->resolution->name ?? 'No Res' }}</td>
-                        <td>{{ $reject->getSize() }}</td>
-                        <td>@if ($reject->user) <a
-                                    href="{{ route('users.show', ['username' => $reject->user->username]) }}"
-                                    itemprop="url" class="l-breadcrumb-item-link"><span itemprop="title"
-                                                                                        class="l-breadcrumb-item-link-title">{{ $reject->user->username }}
-                                    ({{ $reject->user->group->name }})</span></a> @else System @endif </td>
-                        <td>
-                            <a href="{{ route('users.show', ['username' => $reject->moderated->username]) }}"
-                               itemprop="url" class="l-breadcrumb-item-link"><span itemprop="title"
-                                                                                   class="l-breadcrumb-item-link-title">{{ $reject->moderated->username }}
-                                    ({{ $reject->moderated->group->name }})</span></a></td>
-                        <td><a href="{{ route('staff.moderation.approve', ['id' => $reject->id]) }}" role='button'
-                               class='btn btn-labeled btn-success'>
-                                <span class="btn-label">
-                                    <i class="{{ config('other.font-awesome') }} fa-thumbs-up"></i>
-                                </span>
-                                @lang('common.moderation-approve')
-                            </a></td>
-                        <td>
-                            <button data-target="#rejectpost-{{ $reject->id }}" data-toggle="modal" class="btn btn-labeled btn-danger">
-                                    <span class="btn-label"><i class="{{ config('other.font-awesome') }} fa-pause"></i></span>
-                                @lang('common.moderation-postpone')
-                            </button>
-
-                            <div class="modal fade" id="rejectpost-{{ $reject->id }}" tabindex="-1" role="dialog"
-                                 aria-hidden="true">
-                                <form method="POST" action="{{ route('staff.moderation.postpone') }}">
-                                    @csrf
-                                    <div class="modal-dialog{{ \modal_style() }}">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <button type="button" class="close" data-dismiss="modal"
-                                                        aria-label="@lang('common.close')"><span aria-hidden="true">×</span>
-                                                </button>
-                                                <h4 class="modal-title" id="myModalLabel">
-                                                    @lang('common.moderation-postpone') @lang('torrent.torrent'): {{ $reject->name }}
-                                                </h4>
-                                            </div>
-                                            <div class="modal-body">
-                                                <div class="form-group">
-                                                    <input id="type" name="type" type="hidden"
-                                                           value="@lang('torrent.torrent')">
-                                                    <input id="id" name="id" type="hidden" value="{{ $reject->id }}">
-                                                    <input id="slug" name="slug" type="hidden" value="{{ $reject->slug }}">
-                                                    <label for="postpone_reason"
-                                                           class="col-sm-2 control-label">@lang('common.reason')</label>
-                                                    <div class="col-sm-10">
-                                                        <label for="message"></label>
-                                                        <textarea title="Postpone message" class="form-control" rows="5" name="message" cols="50" id="message"></textarea>
-                                                    </div>
-                                                </div>
-                                                <div class="form-group">
-                                                    <div class="col-sm-10 col-sm-offset-2">
-                                                        <button class="btn btn-danger" type="submit">
-                                                            @lang('common.moderation-postpone')
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button class="btn btn-sm btn-primary" type="button"
-                                                        data-dismiss="modal">@lang('common.close')</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </form>
-                            </div>
-                        </td>
-                        <td><a href="{{ route('edit', ['id' => $reject->id]) }}" role='button'
-                               class='btn btn-labeled btn-info'><span class="btn-label"><i
-                                            class="{{ config('other.font-awesome') }} fa-pencil"></i></span>@lang('common.edit')</a></td>
-                        <td>
-                            <button data-target="#rejectdelete-{{ $reject->id }}" data-toggle="modal"
-                                    class="btn btn-labeled btn-danger"><span class="btn-label"><i
-                                            class="{{ config('other.font-awesome') }} fa-thumbs-down"></i></span>@lang('common.delete')
-                            </button>
-
-                            <div class="modal fade" id="rejectdelete-{{ $reject->id }}" tabindex="-1" role="dialog"
-                                 aria-hidden="true">
-                                <form method="POST" action=" {{ route('delete') }}">
-                                    @csrf
-                                    <div class="modal-dialog{{ \modal_style() }}">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <button type="button" class="close" data-dismiss="modal"
-                                                        aria-label="@lang('common.close')"><span aria-hidden="true">×</span>
-                                                </button>
-                                                <h4 class="modal-title" id="myModalLabel">
-                                                    @lang('common.delete') @lang('torrent.torrent'): {{ $reject->name }}
-                                                </h4>
-                                            </div>
-                                            <div class="modal-body">
-
-                                                <div class="form-group">
-                                                    <input id="type" type="hidden" name="type"
-                                                           value="@lang('torrent.torrent')">
-                                                    <input id="id" type="hidden" name="id" value="{{ $reject->id }}">
-                                                    <input id="slug" type="hidden" name="slug" value="{{ $reject->slug }}">
-                                                    <label for="file_name"
-                                                           class="col-sm-2 control-label">@lang('torrent.torrent')</label>
-                                                    <div class="col-sm-10">
-                                                        <p id="title" name="title" class="form-control-static">{{ $reject->name }}</p>
-                                                    </div>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label for="report_reason"
-                                                           class="col-sm-2 control-label">@lang('common.reason')</label>
-                                                    <div class="col-sm-10">
-                                                        <label for="message"></label>
-                                                        <textarea title="Deletion message" class="form-control" rows="5" name="message" cols="50" id="message"></textarea>
-                                                    </div>
-                                                </div>
-                                                <div class="form-group">
-                                                    <div class="col-sm-10 col-sm-offset-2">
-                                                        <button class="btn btn-danger" type="submit">@lang('common.delete')</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button class="btn btn-sm btn-primary" type="button"
-                                                        data-dismiss="modal">@lang('common.close')</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                @endforeach
+                    @forelse ($rejected as $torrent)
+                        <tr>
+                            <td>
+                                <time
+                                    datetime="{{ $torrent->moderated_at }}"
+                                    title="{{ $torrent->moderated_at }}"
+                                >
+                                    {{ $torrent->moderated_at->diffForHumans() }}
+                                </time>
+                            </td>
+                            <td>
+                                <a href="{{ route('torrents.show', ['id' => $torrent->id]) }}">
+                                    {{ $torrent->name }}
+                                </a>
+                            </td>
+                            <td>
+                                <i
+                                    class="{{ $torrent->category->icon }} category__icon"
+                                    title="{{ $torrent->category->name }} torrent"
+                                ></i>
+                            </td>
+                            <td>{{ $torrent->type->name }}</td>
+                            <td>{{ $torrent->resolution->name ?? 'No res' }}</td>
+                            <td>{{ $torrent->getSize() }}</td>
+                            <td>
+                                <x-user-tag :anon="false" :user="$torrent->user" />
+                            </td>
+                            <td>
+                                <x-user-tag :anon="false" :user="$torrent->moderated" />
+                            </td>
+                            <td>
+                                <menu class="data-table__actions">
+                                    <li class="data-table__action">
+                                        <form
+                                            method="POST"
+                                            action="{{ route('staff.moderation.update', ['id' => $torrent->id]) }}"
+                                        >
+                                            @csrf
+                                            <input
+                                                type="hidden"
+                                                name="old_status"
+                                                value="{{ $torrent->status }}"
+                                            />
+                                            <input
+                                                type="hidden"
+                                                name="status"
+                                                value="{{ \App\Enums\ModerationStatus::APPROVED }}"
+                                            />
+                                            <button class="form__button form__button--filled">
+                                                <i
+                                                    class="{{ config('other.font-awesome') }} fa-thumbs-up"
+                                                ></i>
+                                                {{ __('common.moderation-approve') }}
+                                            </button>
+                                        </form>
+                                    </li>
+                                    @include('Staff.moderation.partials._postpone-dialog', ['torrent' => $torrent])
+                                    <li class="data-table__action">
+                                        <a
+                                            href="{{ route('torrents.edit', ['id' => $torrent->id]) }}"
+                                            class="form__button form__button--filled"
+                                        >
+                                            <i
+                                                class="{{ config('other.font-awesome') }} fa-pencil"
+                                            ></i>
+                                            {{ __('common.edit') }}
+                                        </a>
+                                    </li>
+                                    @include('Staff.moderation.partials._delete-dialog', ['torrent' => $torrent])
+                                </menu>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="9">No rejected torrents</td>
+                        </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
-        </div>
+    </section>
 @endsection

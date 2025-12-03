@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,9 +17,10 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Staff\StorePageRequest;
+use App\Http\Requests\Staff\UpdatePageRequest;
 use App\Models\Page;
-use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use Exception;
 
 /**
  * @see \Tests\Todo\Feature\Http\Controllers\PageControllerTest
@@ -28,9 +32,9 @@ class PageController extends Controller
      */
     public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $pages = Page::all();
-
-        return \view('Staff.page.index', ['pages' => $pages]);
+        return view('Staff.page.index', [
+            'pages' => Page::all(),
+        ]);
     }
 
     /**
@@ -38,94 +42,51 @@ class PageController extends Controller
      */
     public function create(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        return \view('Staff.page.create');
+        return view('Staff.page.create');
     }
 
     /**
      * Store A New Page.
-     *
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function store(Request $request)
+    public function store(StorePageRequest $request): \Illuminate\Http\RedirectResponse
     {
-        $page = new Page();
-        $page->name = $request->input('name');
-        $page->slug = Str::slug($page->name);
-        $page->content = $request->input('content');
+        Page::create($request->validated());
 
-        $v = \validator($page->toArray(), [
-            'name'    => 'required',
-            'slug'    => 'required',
-            'content' => 'required',
-        ]);
-
-        if ($v->fails()) {
-            return \redirect()->route('staff.pages.index')
-                ->withErrors($v->errors());
-        }
-        $page->save();
-
-        return \redirect()->route('staff.pages.index')
-            ->withSuccess('Page has been created successfully');
+        return to_route('staff.pages.index')
+            ->with('success', 'Page has been created successfully');
     }
 
     /**
      * Page Edit Form.
-     *
-     * @param \App\Models\Page $id
      */
-    public function edit($id): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    public function edit(Page $page): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $page = Page::findOrFail($id);
-
-        return \view('Staff.page.edit', ['page' => $page]);
+        return view('Staff.page.edit', [
+            'page' => $page,
+        ]);
     }
 
     /**
      * Edit A Page.
-     *
-     * @param \App\Models\Page $id
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function update(Request $request, $id)
+    public function update(UpdatePageRequest $request, Page $page): \Illuminate\Http\RedirectResponse
     {
-        $page = Page::findOrFail($id);
-        $page->name = $request->input('name');
-        $page->slug = Str::slug($page->name);
-        $page->content = $request->input('content');
+        $page->update($request->validated());
 
-        $v = \validator($page->toArray(), [
-            'name'    => 'required',
-            'slug'    => 'required',
-            'content' => 'required',
-        ]);
-
-        if ($v->fails()) {
-            return \redirect()->route('staff.pages.index')
-                ->withErrors($v->errors());
-        }
-        $page->save();
-
-        return \redirect()->route('staff.pages.index')
-            ->withSuccess('Page has been edited successfully');
+        return to_route('staff.pages.index')
+            ->with('success', 'Page has been edited successfully');
     }
 
     /**
      * Delete A Page.
      *
-     * @param \App\Models\Page $id
-     *
-     * @throws \Exception
-     *
-     * @return \Illuminate\Http\RedirectResponse
+     * @throws Exception
      */
-    public function destroy($id)
+    public function destroy(Page $page): \Illuminate\Http\RedirectResponse
     {
-        Page::findOrFail($id)->delete();
+        $page->delete();
 
-        return \redirect()->route('staff.pages.index')
-            ->withSuccess('Page has been deleted successfully');
+        return to_route('staff.pages.index')
+            ->with('success', 'Page has been deleted successfully');
     }
 }

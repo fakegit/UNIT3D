@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,6 +16,8 @@
 
 namespace App\Http\Resources;
 
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class TorrentsResource extends ResourceCollection
@@ -20,23 +25,40 @@ class TorrentsResource extends ResourceCollection
     /**
      * Transform the resource collection into an array.
      *
-     * @param \Illuminate\Http\Request $request
-     *
-     * @return array
+     * @return array{
+     *     data: \Illuminate\Http\Resources\Json\AnonymousResourceCollection,
+     * }
      */
-    public function toArray($request)
+    public function toArray(Request $request): array
     {
         return [
             'data' => TorrentResource::collection($this->collection),
         ];
     }
 
-    public function with($request)
+    /**
+     * Get additional data that should be returned with the resource array.
+     *
+     * @return array{
+     *     links: array{
+     *         self: string,
+     *     }
+     * }
+     */
+    public function with(Request $request): array
     {
         return [
-            'links'    => [
-                'self' => \route('torrents.index'),
+            'links' => [
+                'self' => route('api.torrents.index'),
             ],
         ];
+    }
+
+    /**
+     * Customize the outgoing response for the resource.
+     */
+    public function withResponse(Request $request, JsonResponse $response): void
+    {
+        $response->setEncodingOptions(JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
     }
 }

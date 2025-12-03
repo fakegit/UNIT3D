@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -15,49 +18,53 @@ namespace App\Http\Livewire;
 
 use App\Models\Thank;
 use App\Models\Torrent;
+use App\Models\User;
+use App\Notifications\NewThank;
 use Livewire\Component;
 
 class ThankButton extends Component
 {
-    public $torrent;
-    public $user;
+    public ?Torrent $torrent = null;
 
-    final public function mount($torrent): void
+    public ?User $user = null;
+
+    final public function mount(): void
     {
-        $this->user = \auth()->user();
-        $this->torrent = Torrent::withAnyStatus()->findOrFail($torrent);
+        $this->user = auth()->user();
     }
 
     final public function store(): void
     {
         if ($this->user->id === $this->torrent->user_id) {
-            $this->dispatchBrowserEvent('error', ['type' => 'error',  'message' => 'You Cannot Thank Your Own Content!']);
+            $this->dispatch('error', type: 'error', message: 'You cannot thank your own content!');
 
             return;
         }
 
-        $thank = Thank::where('user_id', '=', $this->user->id)->where('torrent_id', '=', $this->torrent->id)->first();
-        if ($thank) {
-            $this->dispatchBrowserEvent('error', ['type' => 'error',  'message' => 'You Have Already Thanked!']);
+        if (Thank::query()->whereBelongsTo($this->user)->whereBelongsTo($this->torrent)->exists()) {
+            $this->dispatch('error', type: 'error', message: 'You have already thanked!');
 
             return;
         }
 
-        $thank = new Thank();
-        $thank->user_id = $this->user->id;
-        $thank->torrent_id = $this->torrent->id;
-        $thank->save();
+        $thank = Thank::create([
+            'user_id'    => $this->user->id,
+            'torrent_id' => $this->torrent->id,
+        ]);
 
-        //Notification
-        if ($this->user->id !== $this->torrent->user_id) {
-            $this->torrent->notifyUploader('thank', $thank);
+        $uploader = $this->torrent->user;
+
+        if ($uploader->acceptsNotification($this->user, $uploader, 'torrent', 'show_torrent_thank')) {
+            $uploader->notify(new NewThank('torrent', $thank));
         }
 
-        $this->dispatchBrowserEvent('success', ['type' => 'success',  'message' => 'Your Thank Was Successfully Applied!']);
+        $this->dispatch('success', type: 'success', message: 'Your thank was successfully applied!');
+
+        $this->torrent->loadCount('thanks');
     }
 
     final public function render(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Contracts\Foundation\Application
     {
-        return \view('livewire.thank-button');
+        return view('livewire.thank-button');
     }
 }

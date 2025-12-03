@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * NOTICE OF LICENSE.
  *
@@ -12,7 +14,6 @@
  */
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Image Driver
@@ -38,5 +39,4 @@ return [
     */
 
     'max_upload_size' => '2000000',
-
 ];

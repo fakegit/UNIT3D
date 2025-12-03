@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,26 +16,35 @@
 
 namespace App\Http\Resources;
 
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * @mixin \App\Models\UserEcho
+ */
 class UserEchoResource extends JsonResource
 {
     /**
      * Transform the resource into an array.
      *
-     * @param \Illuminate\Http\Request $request
-     *
-     * @return array
+     * @return array{
+     *     id: int,
+     *     user_id: int,
+     *     user: ChatUserResource,
+     *     target: ChatUserResource,
+     *     room: \App\Models\Chatroom,
+     *     bot: \App\Models\Bot,
+     * }
      */
-    public function toArray($request)
+    public function toArray(Request $request): array
     {
         return [
-            'id'         => $this->id,
-            'user_id'    => $this->user_id,
-            'user'       => $this->user,
-            'target'     => $this->target,
-            'room'       => $this->room,
-            'bot'        => $this->bot,
+            'id'      => $this->id,
+            'user_id' => $this->user_id,
+            'user'    => new ChatUserResource($this->user),
+            'target'  => new ChatUserResource($this->target),
+            'room'    => $this->room,
+            'bot'     => $this->bot,
         ];
     }
 }

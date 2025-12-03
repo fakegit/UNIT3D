@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -15,7 +18,7 @@ namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\Seedbox;
-use Illuminate\Http\Request;
+use Exception;
 
 /**
  * @see \Tests\Todo\Feature\Http\Controllers\SeedboxControllerTest
@@ -27,29 +30,21 @@ class SeedboxController extends Controller
      */
     public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $seedboxes = Seedbox::with('user')->latest()->paginate(50);
-
-        return \view('Staff.seedbox.index', ['seedboxes' => $seedboxes]);
+        return view('Staff.seedbox.index', [
+            'seedboxes' => Seedbox::with('user.group')->latest()->paginate(50),
+        ]);
     }
 
     /**
      * Delete A Registered Seedbox.
      *
-     * @param \App\Models\Seedbox $id
-     *
-     * @throws \Exception
-     *
-     * @return \Illuminate\Http\RedirectResponse
+     * @throws Exception
      */
-    public function destroy(Request $request, $id)
+    public function destroy(Seedbox $seedbox): \Illuminate\Http\RedirectResponse
     {
-        $user = $request->user();
-        $seedbox = Seedbox::findOrFail($id);
-
-        \abort_unless($user->group->is_modo, 403);
         $seedbox->delete();
 
-        return \redirect()->route('staff.seedboxes.index')
-            ->withSuccess('Seedbox Record Has Successfully Been Deleted');
+        return to_route('staff.seedboxes.index')
+            ->with('success', 'Seedbox record has successfully been deleted');
     }
 }

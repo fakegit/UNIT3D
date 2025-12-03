@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,9 +17,10 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Staff\StoreInternalRequest;
+use App\Http\Requests\Staff\UpdateInternalRequest;
 use App\Models\Internal;
-use Carbon\Carbon;
-use Illuminate\Http\Request;
+use App\Models\User;
 
 /**
  * @see \Tests\Feature\Http\Controllers\Staff\GroupControllerTest
@@ -25,135 +29,91 @@ class InternalController extends Controller
 {
     /**
      * Display All Internal Groups.
-     *
-     * @param \Illuminate\Http\Request $request
-     *
-     * @return \Illuminate\Contracts\View\Factory|\Illuminate\View\View
      */
-    public function index(Request $request)
+    public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $user = $request->user();
-        \abort_unless($user->group->is_modo, 403);
-
-        $internals = Internal::all()->sortBy('name');
-
-        return \view('Staff.internals.index', ['internals' => $internals]);
+        return view('Staff.internals.index', [
+            'internalGroups' => Internal::orderBy('name')->get(),
+            'internalUsers'  => User::with(['group', 'internals'])
+                ->withCount('torrents as total_uploads')
+                ->whereRelation('group', 'is_internal', '=', true)
+                ->orWhereHas('internals')
+                // Count recent uploads for current user
+                ->withCount(['torrents as recent_uploads' => fn ($query) => $query
+                    ->where('created_at', '>', now()->subDays(60))
+                ])
+                // Count total personal releases for current user
+                ->withCount(['torrents as total_personal_releases' => fn ($query) => $query
+                    ->where('personal_release', '=', true)
+                ])
+                // Count recent personal releases for current user
+                ->withCount(['torrents as recent_personal_releases' => fn ($query) => $query
+                    ->where('personal_release', '=', true)
+                    ->where('created_at', '>', now()->subDays(60))
+                ])
+                // Count total internal releases for current user
+                ->withCount(['torrents as total_internal_releases' => fn ($query) => $query
+                    ->where('internal', '=', 1)
+                ])
+                // Count recent internal releases for current user
+                ->withCount(['torrents as recent_internal_releases' => fn ($query) => $query
+                    ->where('internal', '=', 1)
+                    ->where('created_at', '>', now()->subDays(60))
+                ])
+                ->get(),
+        ]);
     }
 
     /**
      * Edit A group.
-     *
-     * @param \Illuminate\Http\Request $request
-     * @param \App\Models\UsersVIP     $id
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function edit(Request $request, $id)
+    public function edit(Internal $internal): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
     {
-        $user = $request->user();
-        \abort_unless($user->group->is_modo, 403);
-
-        $date = Carbon::now();
-        $internal = Internal::findOrFail($id);
-
-        return \view('Staff.internals.edit', ['internal' => $internal]);
+        return view('Staff.internals.edit', [
+            'internal' => $internal->load([
+                'users' => fn ($query) => $query->with('group')->orderByPivot('position', 'asc'),
+            ]),
+        ]);
     }
 
     /**
      * Save a group change.
-     *
-     * @param \Illuminate\Http\Request $request
-     * @param \App\Models\UsersVIP     $id
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function update(Request $request, $id)
+    public function update(UpdateInternalRequest $request, Internal $internal): \Illuminate\Http\RedirectResponse
     {
-        $user = $request->user();
-        \abort_unless($user->group->is_modo, 403);
+        $internal->update($request->validated());
 
-        $internal = Internal::findOrFail($id);
-
-        $internal->name = $request->input('name');
-        $internal->icon = $request->input('icon');
-        $internal->effect = $request->input('effect');
-
-        $v = \validator($internal->toArray(), [
-            'name'      => 'required',
-            'icon'      => 'required',
-            'effect'    => 'required',
-        ]);
-
-        if ($v->fails()) {
-            return \redirect()->route('staff.internals.index')
-                ->withErrors($v->errors());
-        }
-        $internal->save();
-
-        return \redirect()->route('staff.internals.index')
-            ->withSuccess('Internal Group Was Updated Successfully!');
+        return to_route('staff.internals.index')
+            ->with('success', 'Internal group was updated successfully!');
     }
 
     /**
      * Internal Add Form.
-     *
-     * @return \Illuminate\Contracts\View\Factory|\Illuminate\View\View
      */
-    public function create()
+    public function create(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        return \view('Staff.internals.create');
+        return view('Staff.internals.create');
     }
 
     /**
      * Store A New Internal Group.
-     *
-     * @param \Illuminate\Http\Request $request
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function store(Request $request)
+    public function store(StoreInternalRequest $request): \Illuminate\Http\RedirectResponse
     {
-        $user = $request->user();
-        \abort_unless($user->group->is_admin, 403);
+        Internal::create($request->validated());
 
-        $internal = new Internal();
-        $internal->name = $request->input('name');
-        $internal->icon = $request->input('icon');
-        $internal->effect = $request->input('effect');
-
-        $v = \validator($internal->toArray(), [
-            'name'     => 'required|unique:internals',
-            'icon',
-            'effect',
-        ]);
-
-        if ($v->fails()) {
-            return \redirect()->route('staff.internals.index')
-                ->withErrors($v->errors());
-        }
-        $internal->save();
-
-        return \redirect()->route('staff.internals.index')
-            ->withSuccess('New Internal Group added!');
+        return to_route('staff.internals.index')
+            ->with('success', 'New internal group added!');
     }
 
     /**
      * Delete A Internal Group.
-     *
-     * @param \Illuminate\Http\Request $request
-     * @param                          $commentId
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function destroy(Request $request, $id)
+    public function destroy(Internal $internal): \Illuminate\Http\RedirectResponse
     {
-        $user = $request->user();
-        $internal = Internal::findOrFail($id);
-
-        \abort_unless($user->group->is_admin, 403);
         $internal->delete();
 
-        return \redirect()->route('staff.internals.index')
-            ->withSuccess('Group Has Been Removed.');
+        return to_route('staff.internals.index')
+            ->with('success', 'Group has been removed.');
     }
 }

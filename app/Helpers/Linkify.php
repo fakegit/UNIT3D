@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -19,15 +22,19 @@ use VStelmakh\UrlHighlight\Validator\Validator;
 
 class Linkify
 {
-    /**
-     * @var string
-     */
-    public function linky($text)
+    public function linky(string $text): string
     {
         $validator = new Validator(
             false, // bool - if should use top level domain to match urls without scheme
             [],    // string[] - array of blacklisted schemes
-            [],    // string[] - array of whitelisted schemes
+            [
+                'http',
+                'https',
+                'irc',
+                'ftp',
+                'sftp',
+                'magnet',
+            ],    // string[] - array of whitelisted schemes
             true   // bool - if should match emails (if match by TLD set to "false" - will match only "mailto" urls)
         );
 
@@ -38,8 +45,6 @@ class Linkify
             ''      // string - content to add after highlight: ...</a>{here}
         );
 
-        $urlHighlight = new UrlHighlight($validator, $highlighter);
-
-        return $urlHighlight->highlightUrls($text);
+        return (new UrlHighlight($validator, $highlighter))->highlightUrls($text);
     }
 }

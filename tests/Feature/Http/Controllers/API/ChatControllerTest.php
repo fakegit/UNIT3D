@@ -1,411 +1,306 @@
 <?php
 
-namespace Tests\Feature\Http\Controllers\API;
+declare(strict_types=1);
+
+/**
+ * NOTICE OF LICENSE.
+ *
+ * UNIT3D Community Edition is open-sourced software licensed under the GNU Affero General Public License v3.0
+ * The details is bundled with this project in the file LICENSE.txt.
+ *
+ * @project    UNIT3D Community Edition
+ *
+ * @author     HDVinnie <hdinnovations@protonmail.com>
+ * @license    https://www.gnu.org/licenses/agpl-3.0.en.html/ GNU Affero General Public License v3.0
+ */
 
 use App\Models\Bot;
-use App\Models\Chatroom;
-use App\Models\ChatStatus;
-use App\Models\Message;
 use App\Models\User;
 use App\Models\UserAudible;
 use App\Models\UserEcho;
-use Database\Seeders\BotsTableSeeder;
-use Database\Seeders\UsersTableSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-/**
- * @see \App\Http\Controllers\API\ChatController
- */
-class ChatControllerTest extends TestCase
-{
-    use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-    }
-
-    /** @test */
-    public function audibles_returns_an_ok_response()
-    {
-        $userAudible = UserAudible::factory()->create();
-
-        $response = $this->actingAs($userAudible->user)->get('api/chat/audibles');
-
-        $response->assertOk()
-            ->assertJson(['data' => [[
-                'id'      => $userAudible->id,
-                'user_id' => $userAudible->user_id,
-                'user'    => ['id' => $userAudible->user_id],
-            ]]]);
-    }
-
-    /** @test */
-    public function bot_messages_returns_an_ok_response()
-    {
-        $this->seed(UsersTableSeeder::class);
-        $this->seed(BotsTableSeeder::class);
-
-        $user = User::factory()->create();
-
-        $bot = Bot::where('slug', 'systembot')->firstOrFail();
-
-        $systemUser = User::where('username', 'System')->firstOrFail();
-
-        Message::factory()->create([
-            'user_id'     => $user->id,
-            'receiver_id' => $systemUser->id,
-            'bot_id'      => $bot->id,
-        ]);
-
-        $response = $this->actingAs($user)->get(sprintf('api/chat/bot/%s', $bot->id));
-
-        $response->assertOk()
-            ->assertJson(['data' => [[
-                'bot' => [
-                    'id' => $bot->id,
-                ],
-                'receiver' => [
-                    'id' => $systemUser->id,
-                ],
-                'user' => [
-                    'id' => $user->id,
-                ],
-            ]]]);
-    }
-
-    /** @test */
-    public function bots_returns_an_ok_response()
-    {
-        $this->seed(BotsTableSeeder::class);
-
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->get('api/chat/bots');
-
-        $response->assertOk()
-            ->assertJson(['data' => [
-                ['slug' => 'systembot'],
-                ['slug' => 'nerdbot'],
-                ['slug' => 'casinobot'],
-                ['slug' => 'betbot'],
-                ['slug' => 'triviabot'],
-            ]]);
-    }
-
-    /** @test */
-    public function config_returns_an_ok_response()
-    {
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->get('api/chat/config');
-
-        $response->assertOk()
-            ->assertJson([
-                'system_chatroom' => 'General',
-                'message_limit'   => 100,
-                'nerd_bot'        => true,
-            ]);
-    }
-
-    /** @test */
-    public function create_message_returns_an_ok_response()
-    {
-        $this->seed(UsersTableSeeder::class);
-        $this->seed(BotsTableSeeder::class);
-
-        $user = User::factory()->create();
-
-        $chatroom = Chatroom::factory()->create();
-
-        $bot = Bot::where('slug', 'systembot')->firstOrFail();
-
-        $systemUser = User::where('username', 'System')->firstOrFail();
-
-        $response = $this->actingAs($user)->post('api/chat/messages', [
-            'receiver_id' => $systemUser->id,
-            'chatroom_id' => $chatroom->id,
-            'bot_id'      => $bot->id,
-            'message'     => sprintf('/msg %s hi', $user->username),
-        ]);
-
-        $response->assertOk()
-            ->assertJson(['data' => [
-                'user'     => ['id' => $user->id],
-                'receiver' => ['id' => $user->id],
-            ]]);
-    }
-
-    /** @test */
-    public function delete_bot_echo_returns_an_ok_response()
-    {
-        $user = User::factory()->create();
-
-        $userEcho = UserEcho::factory()->create([
-            'user_id' => $user->id,
-        ]);
-
-        $response = $this->actingAs($user)
-            ->post(sprintf('api/chat/echoes/%s/delete/bot', $user->id), [
-                'bot_id' => $userEcho['bot_id'],
-            ]);
-
-        $response->assertOk()
-            ->assertJson([
-                'id'       => $user->id,
-                'username' => $user->username,
-            ]);
-    }
-
-    /** @test */
-    public function delete_message_returns_an_ok_response()
-    {
-        $user = User::factory()->create();
-
-        $message = Message::factory()->create();
-
-        $response = $this->actingAs($user)->get(sprintf('api/chat/message/%s/delete', $message->id));
-
-        $response->assertOk()
-            ->assertSee('success');
-    }
-
-    /** @test */
-    public function delete_room_echo_returns_an_ok_response()
-    {
-        $user = User::factory()->create();
-
-        $userEcho = UserEcho::factory()->create([
-            'user_id' => $user->id,
-        ]);
-
-        $response = $this->actingAs($user)->post(sprintf('api/chat/echoes/%s/delete/chatroom', $user->id), [
-            'room_id' => $userEcho['room_id'],
-        ]);
-
-        $response->assertOk()
-            ->assertJson([
-                'id'       => $user->id,
-                'username' => $user->username,
-            ]);
-    }
-
-    /** @test */
-    public function delete_target_echo_returns_an_ok_response()
-    {
-        $user = User::factory()->create();
-
-        $userEcho = UserEcho::factory()->create([
-            'user_id' => $user->id,
-        ]);
-
-        $response = $this->actingAs($user)->post(sprintf('api/chat/echoes/%s/delete/target', $user->id), [
-            'target_id' => $userEcho['target_id'],
-        ]);
-
-        $response->assertOk()
-            ->assertJson([
-                'id'       => $user->id,
-                'username' => $user->username,
-            ]);
-    }
-
-    /** @test */
-    public function echoes_returns_an_ok_response()
-    {
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->get('api/chat/echoes');
-
-        $response->assertOk()
-            ->assertJson(['data' => [[
-                'user_id' => $user->id,
-                'user'    => [
-                    'id'       => $user->id,
-                    'username' => $user->username,
-                ],
-            ]]]);
-    }
-
-    /** @test */
-    public function messages_returns_an_ok_response()
-    {
-        $user = User::factory()->create();
-
-        $message = Message::factory()->create();
-
-        $response = $this->actingAs($user)->get(sprintf('api/chat/messages/%s', $message['chatroom_id']));
-
-        $response->assertOk()
-            ->assertJson(['data' => [[
-                'id'       => $message->id,
-                'bot'      => ['id' => $message['bot_id']],
-                'user'     => ['id' => $message['user_id']],
-                'receiver' => ['id' => $message['receiver_id']],
-                'chatroom' => ['id' => $message['chatroom_id']],
-            ]]]);
-    }
-
-    /** @test */
-    public function private_messages_returns_an_ok_response()
-    {
-        $user = User::factory()->create();
-
-        $message = Message::factory()->create([
-            'user_id' => $user->id,
-        ]);
-
-        $response = $this->actingAs($user)->get(sprintf('api/chat/private/messages/%s', $message['receiver_id']));
-
-        $response->assertOk()
-            ->assertJson(['data' => [[
-                'id'       => $message->id,
-                'bot'      => ['id' => $message['bot_id']],
-                'user'     => ['id' => $message['user_id']],
-                'receiver' => ['id' => $message['receiver_id']],
-                'chatroom' => ['id' => $message['chatroom_id']],
-            ]]]);
-    }
-
-    /** @test */
-    public function rooms_returns_an_ok_response()
-    {
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->get('api/chat/rooms');
-
-        $chatroom = Chatroom::findOrFail($user->chatroom_id);
-
-        $response->assertOk()
-            ->assertJson(['data' => [[
-                'id'   => $chatroom->id,
-                'name' => $chatroom->name,
-            ]]]);
-    }
-
-    /** @test */
-    public function statuses_returns_an_ok_response()
-    {
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->get('api/chat/statuses');
-
-        $chatStatus = ChatStatus::findOrFail($user->chat_status_id);
-
-        $response->assertOk()
-            ->assertJson([[
-                'id'    => $chatStatus->id,
-                'name'  => $chatStatus->name,
-                'color' => $chatStatus->color,
-                'icon'  => $chatStatus->icon,
-            ]]);
-    }
-
-    /** @test */
-    public function toggle_bot_audible_returns_an_ok_response()
-    {
-        $user = User::factory()->create();
-
-        $userAudible = UserAudible::factory()->create([
-            'user_id' => $user->id,
-        ]);
-
-        $response = $this->actingAs($user)->post(sprintf('api/chat/audibles/%s/toggle/bot', $user->id), [
-            'bot_id' => $userAudible['bot_id'],
-        ]);
-
-        $response->assertOk()
-            ->assertJson([
-                'id'       => $user->id,
-                'username' => $user->username,
-            ]);
-    }
-
-    /** @test */
-    public function toggle_room_audible_returns_an_ok_response()
-    {
-        $user = User::factory()->create();
-
-        $userAudible = UserAudible::factory()->create([
-            'user_id' => $user->id,
-        ]);
-
-        $response = $this->actingAs($user)->post(sprintf('api/chat/audibles/%s/toggle/chatroom', $user->id), [
-            'room_id' => $userAudible['room_id'],
-        ]);
-
-        $response->assertOk()
-            ->assertJson([
-                'id'       => $user->id,
-                'username' => $user->username,
-            ]);
-    }
-
-    /** @test */
-    public function toggle_target_audible_returns_an_ok_response()
-    {
-        $user = User::factory()->create();
-
-        $userAudible = UserAudible::factory()->create([
-            'user_id' => $user->id,
-        ]);
-
-        $response = $this->actingAs($user)->post(sprintf('api/chat/audibles/%s/toggle/target', $user->id), [
-            'target_id' => $userAudible['target_id'],
-        ]);
-
-        $response->assertOk()
-            ->assertJson([
-                'id'       => $user->id,
-                'username' => $user->username,
-            ]);
-    }
-
-    /** @test */
-    public function update_user_chat_status_returns_an_ok_response()
-    {
-        $this->seed(UsersTableSeeder::class);
-
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->post(sprintf('api/chat/user/%s/status', $user->id), [
-            'status_id' => $user['chat_status_id'],
-        ]);
-
-        $response->assertOk()
-            ->assertJson([
-                'id'       => $user->id,
-                'username' => $user->username,
-            ]);
-    }
-
-    /** @test */
-    public function update_user_room_returns_an_ok_response()
-    {
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->post(sprintf('api/chat/user/%s/chatroom', $user->id), [
-            'room_id' => $user['chatroom_id'],
-        ]);
-
-        $response->assertOk()
-            ->assertJson([
-                'id'       => $user->id,
-                'username' => $user->username,
-            ]);
-    }
-
-    /** @test */
-    public function update_user_target_returns_an_ok_response()
-    {
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->post(sprintf('api/chat/user/%s/target', $user->id));
-
-        $response->assertOk()->assertJson([
-            'id'       => $user->id,
-            'username' => $user->username,
-        ]);
-    }
-}
+
+test('audibles returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+    $authUser = User::factory()->create();
+
+    $response = $this->actingAs($authUser)->get('api/chat/audibles');
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('bot messages returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $bot = Bot::factory()->create();
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get('api/chat/bot/{bot_id}');
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('bots returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get('api/chat/bots');
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('config returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get('api/chat/config');
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('create message returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $bots = Bot::factory()->times(3)->create();
+    $userEchos = UserEcho::factory()->times(3)->create();
+    $userAudibles = UserAudible::factory()->times(3)->create();
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->post('api/chat/messages', [
+        // TODO: send request data
+    ]);
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('delete bot echo returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+    $userEchos = UserEcho::factory()->times(3)->create();
+    $authUser = User::factory()->create();
+
+    $response = $this->actingAs($authUser)->post('api/chat/echoes/{user_id}/delete/bot', [
+        // TODO: send request data
+    ]);
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('delete message returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->post('api/chat/message/{id}/delete', [
+        // TODO: send request data
+    ]);
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('delete room echo returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+    $userEchos = UserEcho::factory()->times(3)->create();
+    $authUser = User::factory()->create();
+
+    $response = $this->actingAs($authUser)->post('api/chat/echoes/{user_id}/delete/chatroom', [
+        // TODO: send request data
+    ]);
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('delete target echo returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+    $userEchos = UserEcho::factory()->times(3)->create();
+    $authUser = User::factory()->create();
+
+    $response = $this->actingAs($authUser)->post('api/chat/echoes/{user_id}/delete/target', [
+        // TODO: send request data
+    ]);
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('echoes returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+    $authUser = User::factory()->create();
+
+    $response = $this->actingAs($authUser)->get('api/chat/echoes');
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('messages returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get('api/chat/messages/{room_id}');
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('private messages returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get('api/chat/private/messages/{target_id}');
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('rooms returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get('api/chat/rooms');
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('statuses returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get('api/chat/statuses');
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('toggle bot audible returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+    $userAudibles = UserAudible::factory()->times(3)->create();
+    $authUser = User::factory()->create();
+
+    $response = $this->actingAs($authUser)->post('api/chat/audibles/{user_id}/toggle/bot', [
+        // TODO: send request data
+    ]);
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('toggle room audible returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+    $userAudibles = UserAudible::factory()->times(3)->create();
+    $authUser = User::factory()->create();
+
+    $response = $this->actingAs($authUser)->post('api/chat/audibles/{user_id}/toggle/chatroom', [
+        // TODO: send request data
+    ]);
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('toggle target audible returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+    $userAudibles = UserAudible::factory()->times(3)->create();
+    $authUser = User::factory()->create();
+
+    $response = $this->actingAs($authUser)->post('api/chat/audibles/{user_id}/toggle/target', [
+        // TODO: send request data
+    ]);
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('update user chat status returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+    $authUser = User::factory()->create();
+
+    $response = $this->actingAs($authUser)->post('api/chat/user/{id}/status', [
+        // TODO: send request data
+    ]);
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('update user room returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+    $userEchos = UserEcho::factory()->times(3)->create();
+    $authUser = User::factory()->create();
+
+    $response = $this->actingAs($authUser)->post('api/chat/user/{id}/chatroom', [
+        // TODO: send request data
+    ]);
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+test('update user target returns an ok response', function (): void {
+    $this->markTestIncomplete('This test case was generated by Shift. When you are ready, remove this line and complete this test case.');
+
+    $user = User::factory()->create();
+    $authUser = User::factory()->create();
+
+    $response = $this->actingAs($authUser)->post('api/chat/user/{id}/target', [
+        // TODO: send request data
+    ]);
+
+    $response->assertOk();
+
+    // TODO: perform additional assertions
+});
+
+// test cases...

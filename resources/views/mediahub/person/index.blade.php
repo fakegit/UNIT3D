@@ -1,39 +1,26 @@
 @extends('layout.default')
 
 @section('title')
-    <title>@lang('mediahub.persons') - {{ config('other.title') }}</title>
+    <title>{{ __('mediahub.persons') }} - {{ config('other.title') }}</title>
 @endsection
 
 @section('meta')
-    <meta name="description" content="@lang('mediahub.persons')">
+    <meta name="description" content="{{ __('mediahub.persons') }}" />
 @endsection
 
-@section('breadcrumb')
-    <li>
-        <a href="{{ route('mediahub.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('mediahub.title')</span>
+@section('breadcrumbs')
+    <li class="breadcrumbV2">
+        <a href="{{ route('mediahub.index') }}" class="breadcrumb__link">
+            {{ __('mediahub.title') }}
         </a>
     </li>
-    <li class="active">
-        <a href="{{ route('mediahub.persons.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('mediahub.persons')</span>
-        </a>
+    <li class="breadcrumb--active">
+        {{ __('mediahub.persons') }}
     </li>
 @endsection
+
+@section('page', 'page__person--index')
 
 @section('content')
-    <div class="container">
-        <div class="block">
-            <div class="header gradient silver">
-                <div class="inner_content">
-                    <div class="page-title">
-                        <h1 style="margin: 0;">@lang('mediahub.persons')</h1>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="box container">
-        @livewire('person-search')
-    </div>
+    @livewire('tmdb-person-search')
 @endsection

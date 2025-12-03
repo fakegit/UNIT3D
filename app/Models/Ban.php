@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,9 +16,10 @@
 
 namespace App\Models;
 
-use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Ban.
@@ -28,50 +32,43 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null                     $removed_at
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\User $banneduser
- * @property-read \App\Models\User|null $staffuser
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Ban newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Ban newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Ban query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Ban whereBanReason($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Ban whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Ban whereCreatedBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Ban whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Ban whereOwnedBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Ban whereRemovedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Ban whereUnbanReason($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Ban whereUpdatedAt($value)
- * @mixin \Eloquent
  */
-class Ban extends Model
+#[AllowDynamicProperties]
+final class Ban extends Model
 {
+    /** @use HasFactory<\Database\Factories\BanFactory> */
     use HasFactory;
-    use Auditable;
 
     /**
-     * Belongs To A User.
+     * The attributes that aren't mass assignable.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @var string[]
      */
-    public function banneduser()
+    protected $guarded = ['id', 'created_at', 'updated_at'];
+
+    /**
+     * Get the banned user.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owned_by')->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A User.
+     * Get the staff user who issued the ban.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function staffuser()
+    public function staff(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by')->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 }

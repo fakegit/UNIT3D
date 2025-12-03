@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,9 +17,12 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Staff\UpdateReportRequest;
+use App\Models\Conversation;
+use App\Models\Group;
 use App\Models\PrivateMessage;
 use App\Models\Report;
-use Illuminate\Http\Request;
+use App\Models\User;
 
 /**
  * @see \Tests\Todo\Feature\Http\Controllers\ReportControllerTest
@@ -28,64 +34,52 @@ class ReportController extends Controller
      */
     public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $reports = Report::latest()->paginate(25);
-
-        return \view('Staff.report.index', ['reports' => $reports]);
+        return view('Staff.report.index');
     }
 
     /**
      * Show A Report.
-     *
-     * @param \App\Models\Report $id
      */
-    public function show($id): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    public function show(Report $report): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $report = Report::findOrFail($id);
+        // cspell:ignore punct
+        preg_match_all('#\bhttps?://[^,\s()<>]+(?:\([\w\d]+\)|([^,[:punct:]\s]|/))#', (string) $report->message, $match);
 
-        \preg_match_all('#\bhttps?://[^,\s()<>]+(?:\([\w\d]+\)|([^,[:punct:]\s]|/))#', $report->message, $match);
-
-        return \view('Staff.report.show', ['report' => $report, 'urls' => $match[0]]);
+        return view('Staff.report.show', [
+            'report' => $report,
+            'urls'   => $match[0],
+            'staff'  => User::whereIn('group_id', Group::where('is_modo', '=', 1)->whereNot('slug', '=', 'bot')->select('id'))->get(),
+        ]);
     }
 
     /**
      * Update A Report.
-     *
-     * @param \App\Models\Report $id
      */
-    public function update(Request $request, $id): \Illuminate\Http\RedirectResponse
+    public function update(UpdateReportRequest $request, Report $report): \Illuminate\Http\RedirectResponse
     {
-        $user = \auth()->user();
+        $staff = auth()->user();
 
-        $v = \validator($request->all(), [
-            'verdict'  => 'required|min:3',
-            'staff_id' => 'required',
-        ]);
-
-        $report = Report::findOrFail($id);
-
-        if ($report->solved == 1) {
-            return \redirect()->route('staff.reports.index')
-                ->withErrors('This Report Has Already Been Solved');
+        if ($report->solved_by !== null) {
+            return to_route('staff.reports.index')
+                ->withErrors('This report has already been solved');
         }
 
-        $report->verdict = $request->input('verdict');
-        $report->staff_id = $user->id;
-        $report->solved = 1;
-        $report->save();
+        $report->update([
+            'solved_by' => $staff->id,
+            'solved_at' => now(),
+        ] + $request->validated());
 
-        // Send Private Message
-        $privateMessage = new PrivateMessage();
-        $privateMessage->sender_id = $user->id;
-        $privateMessage->receiver_id = $report->reporter_id;
-        $privateMessage->subject = 'Your Report Has A New Verdict';
-        $privateMessage->message = \sprintf('[b]REPORT TITLE:[/b] %s
-        
-                        [b]ORIGINAL MESSAGE:[/b] %s
-                        
-                        [b]VERDICT:[/b] %s', $report->title, $report->message, $report->verdict);
-        $privateMessage->save();
+        $conversation = Conversation::create(['subject' => 'Your Report Has A New Verdict']);
 
-        return \redirect()->route('staff.reports.index')
-            ->withSuccess('Report has been successfully resolved');
+        $conversation->users()->sync([$staff->id => ['read' => true], $report->reporter_id]);
+
+        PrivateMessage::create([
+            'conversation_id' => $conversation->id,
+            'sender_id'       => $staff->id,
+            'message'         => '[b]REPORT TITLE:[/b] '.$report->title."\n\n[b]ORIGINAL MESSAGE:[/b] ".$report->message."\n\n[b]VERDICT:[/b] ".$report->verdict,
+        ]);
+
+        return to_route('staff.reports.index')
+            ->with('success', 'Report has been successfully resolved');
     }
 }

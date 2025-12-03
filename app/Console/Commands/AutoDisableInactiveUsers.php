@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,12 +19,12 @@ namespace App\Console\Commands;
 use App\Jobs\SendDisableUserMail;
 use App\Models\Group;
 use App\Models\User;
-use Carbon\Carbon;
+use App\Services\Unit3dAnnounce;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
+use Exception;
+use Throwable;
 
-/**
- * @see \Tests\Unit\Console\Commands\AutoDisableInactiveUsersTest
- */
 class AutoDisableInactiveUsers extends Command
 {
     /**
@@ -41,40 +44,40 @@ class AutoDisableInactiveUsers extends Command
     /**
      * Execute the console command.
      *
-     * @throws \Exception
-     *
-     * @return mixed
+     * @throws Exception|Throwable If there is an error during the execution of the command.
      */
-    public function handle()
+    final public function handle(): void
     {
-        if (\config('pruning.user_pruning') == true) {
-            $disabledGroup = \cache()->rememberForever('disabled_group', fn () => Group::where('slug', '=', 'disabled')->pluck('id'));
+        if (!config('pruning.user_pruning')) {
+            return;
+        }
 
-            $current = Carbon::now();
+        $disabledGroupId = Group::where('slug', '=', 'disabled')->soleValue('id');
 
-            $matches = User::whereIn('group_id', \config('pruning.group_ids'))->get();
+        $current = Carbon::now();
 
-            $users = $matches->where('created_at', '<', $current->copy()->subDays(\config('pruning.account_age'))->toDateTimeString())
-                ->where('last_login', '<', $current->copy()->subDays(\config('pruning.last_login'))->toDateTimeString())
-                ->all();
+        User::query()
+            ->whereIntegerInRaw('group_id', config('pruning.group_ids'))
+            ->where('created_at', '<', $current->copy()->subDays(config('pruning.account_age')))
+            ->where('last_login', '<', $current->copy()->subDays(config('pruning.last_login')))
+            ->whereDoesntHave('seedingTorrents')
+            ->chunk(100, function ($users) use ($disabledGroupId): void {
+                foreach ($users as $user) {
+                    $user->update([
+                        'group_id'     => $disabledGroupId,
+                        'can_download' => false,
+                        'disabled_at'  => Carbon::now(),
+                    ]);
 
-            foreach ($users as $user) {
-                if ($user->getSeeding() === 0) {
-                    $user->group_id = $disabledGroup[0];
-                    $user->can_upload = 0;
-                    $user->can_download = 0;
-                    $user->can_comment = 0;
-                    $user->can_invite = 0;
-                    $user->can_request = 0;
-                    $user->can_chat = 0;
-                    $user->disabled_at = Carbon::now();
-                    $user->save();
+                    cache()->forget('user:'.$user->passkey);
+
+                    Unit3dAnnounce::addUser($user);
 
                     // Send Email
-                    \dispatch(new SendDisableUserMail($user));
+                    dispatch(new SendDisableUserMail($user));
                 }
-            }
-        }
-        $this->comment('Automated User Disable Command Complete');
+            });
+
+        $this->comment('Automated user disable command complete');
     }
 }

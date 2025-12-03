@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,14 +17,14 @@
 namespace App\Console\Commands;
 
 use App\Models\Peer;
+use App\Models\Scopes\ApprovedScope;
 use App\Models\Seedbox;
 use App\Models\Torrent;
+use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
-/**
- * @see \Tests\Unit\Console\Commands\AutoHighspeedTagTest
- */
 class AutoHighspeedTag extends Command
 {
     /**
@@ -36,32 +39,35 @@ class AutoHighspeedTag extends Command
      *
      * @var string
      */
-    protected $description = 'Updates Torrents Highspeed Tag Based On Registered Seedboxes.';
+    protected $description = 'Updates torrents highspeed tag based on registered seedboxes.';
 
     /**
      * Execute the console command.
      *
-     * @return mixed
+     * @throws Exception|Throwable If there is an error during the execution of the command.
      */
-    public function handle()
+    final public function handle(): void
     {
-        DB::table('torrents')->update(['highspeed' => 0]);
+        $seedboxIps = Seedbox::all()
+            ->pluck('ip')
+            ->filter(fn ($ip) => filter_var($ip, FILTER_VALIDATE_IP) !== false)
+            ->map(fn ($ip) => inet_pton($ip));
 
-        $seedboxUsers = Seedbox::select(['user_id'])->get()->toArray();
+        Torrent::withoutGlobalScope(ApprovedScope::class)
+            ->leftJoinSub(
+                Peer::where('seeder', '=', 1)
+                    ->where('active', '=', 1)
+                    ->distinct()
+                    ->select('torrent_id')
+                    ->whereIn('ip', $seedboxIps),
+                'highspeed_torrents',
+                fn ($join) => $join->on('torrents.id', '=', 'highspeed_torrents.torrent_id')
+            )
+            ->update([
+                'highspeed'  => DB::raw('CASE WHEN highspeed_torrents.torrent_id IS NOT NULL THEN TRUE ELSE FALSE END'),
+                'updated_at' => DB::raw('updated_at'),
+            ]);
 
-        if (\is_array($seedboxUsers) && \count($seedboxUsers) > 0) {
-            $torid = Peer::select(['torrent_id'])->whereIn('user_id', $seedboxUsers)->where('seeder', '=', 1)->get()->toArray();
-
-            foreach ($torid as $id) {
-                $torrent = Torrent::where('id', '=', $id)->first();
-                if (isset($torrent)) {
-                    $torrent->highspeed = 1;
-                    $torrent->save();
-                }
-
-                unset($torrent);
-            }
-        }
-        $this->comment('Automated High Speed Torrents Command Complete');
+        $this->comment('Automated high speed torrents command complete');
     }
 }

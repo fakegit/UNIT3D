@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,7 +16,8 @@
 
 namespace App\Notifications;
 
-use App\Models\TorrentRequest;
+use App\Models\TorrentRequestBounty;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -24,38 +28,57 @@ class NewRequestBounty extends Notification implements ShouldQueue
 
     /**
      * NewRequestBounty Constructor.
-     *
-     * @param $amount
      */
-    public function __construct(public string $type, public string $sender, public $amount, public TorrentRequest $torrentRequest)
+    public function __construct(public TorrentRequestBounty $bounty)
     {
     }
 
     /**
      * Get the notification's delivery channels.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<int, string>
      */
-    public function via($notifiable)
+    public function via(object $notifiable): array
     {
         return ['database'];
     }
 
     /**
+     * Determine if the notification should be sent.
+     */
+    public function shouldSend(User $notifiable): bool
+    {
+        // Do not notify self
+        if ($this->bounty->user_id === $notifiable->id) {
+            return false;
+        }
+
+        if ($notifiable->notification?->block_notifications === 1) {
+            return false;
+        }
+
+        if ($notifiable->notification?->show_request_bounty === 0) {
+            return false;
+        }
+
+        // If the sender's group ID is found in the "Block all notifications from the selected groups" array,
+        // the expression will return false.
+        return ! \in_array($this->bounty->user->group_id, $notifiable->notification?->json_request_groups ?? [], true);
+    }
+
+    /**
      * Get the array representation of the notification.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<string, mixed>
      */
-    public function toArray($notifiable)
+    public function toArray(object $notifiable): array
     {
+        $this->bounty->load('user');
+
         return [
-            'title' => $this->sender.' Has Added A Bounty Of '.$this->amount.' To A Requested Torrent',
-            'body'  => $this->sender.' has added a bounty to one of your Requested Torrents '.$this->torrentRequest->name,
-            'url'   => \sprintf('/requests/%s', $this->torrentRequest->id),
+            'title' => ($this->bounty->anon ? 'Anonymous' : $this->bounty->user->username).' Has Added A Bounty Of '.$this->bounty->seedbonus.' To A Requested Torrent',
+            'body'  => ($this->bounty->anon ? 'Anonymous' : $this->bounty->user->username).' has added a bounty to one of your Requested Torrents '.$this->bounty->request->name,
+            'url'   => \sprintf('/requests/%s', $this->bounty->requests_id),
         ];
     }
 }

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,8 +16,11 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\ApplicationUrlProof.
@@ -24,26 +30,19 @@ use Illuminate\Database\Eloquent\Model;
  * @property string                          $url
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\Application $application
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ApplicationUrlProof newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ApplicationUrlProof newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ApplicationUrlProof query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ApplicationUrlProof whereApplicationId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ApplicationUrlProof whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ApplicationUrlProof whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ApplicationUrlProof whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\ApplicationUrlProof whereUrl($value)
- * @mixin \Eloquent
  */
-class ApplicationUrlProof extends Model
+#[AllowDynamicProperties]
+final class ApplicationUrlProof extends Model
 {
+    use Auditable;
+
+    /** @use HasFactory<\Database\Factories\ApplicationUrlProofFactory> */
     use HasFactory;
 
     /**
-     * The Attributes That Are Mass Assignable.
+     * The attributes that are mass assignable.
      *
-     * @var array
+     * @var list<string>
      */
     protected $fillable = [
         'application_id',
@@ -51,11 +50,11 @@ class ApplicationUrlProof extends Model
     ];
 
     /**
-     * Belongs To A Application.
+     * Get the application that owns the URL proof.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Application, $this>
      */
-    public function application()
+    public function application(): BelongsTo
     {
         return $this->belongsTo(Application::class);
     }

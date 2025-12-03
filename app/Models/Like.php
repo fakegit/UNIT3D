@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,6 +19,8 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Like.
@@ -23,49 +28,58 @@ use Illuminate\Database\Eloquent\Model;
  * @property int                             $id
  * @property int                             $user_id
  * @property int                             $post_id
- * @property int|null                        $like
- * @property int|null                        $dislike
+ * @property bool|null                       $like
+ * @property bool|null                       $dislike
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\Post $post
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Like newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Like newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Like query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Like whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Like whereDislike($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Like whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Like whereLike($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Like wherePostId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Like whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Like whereUserId($value)
- * @mixin \Eloquent
  */
-class Like extends Model
+#[AllowDynamicProperties]
+final class Like extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\LikeFactory> */
+    use HasFactory;
+
     /**
-     * Belongs To A User.
+     * The attributes that aren't mass assignable.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @var string[]
      */
-    public function user()
+    protected $guarded = ['id'];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array{like: 'bool', dislike: 'bool'}
+     */
+    protected function casts(): array
+    {
+        return [
+            'like'    => 'bool',
+            'dislike' => 'bool',
+        ];
+    }
+
+    /**
+     * Get the user that liked.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A Post.
+     * Get the post that was liked.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Post, $this>
      */
-    public function post()
+    public function post(): BelongsTo
     {
         return $this->belongsTo(Post::class);
     }

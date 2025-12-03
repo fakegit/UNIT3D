@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,6 +19,8 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\FeaturedTorrent.
@@ -25,40 +30,31 @@ use Illuminate\Database\Eloquent\Model;
  * @property int                             $torrent_id
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\Torrent $torrent
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FeaturedTorrent newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FeaturedTorrent newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FeaturedTorrent query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FeaturedTorrent whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FeaturedTorrent whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FeaturedTorrent whereTorrentId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FeaturedTorrent whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\FeaturedTorrent whereUserId($value)
- * @mixin \Eloquent
  */
-class FeaturedTorrent extends Model
+#[AllowDynamicProperties]
+final class FeaturedTorrent extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\FeaturedTorrentFactory> */
+    use HasFactory;
+
     /**
-     * Belongs To A Torrent.
+     * Get the torrent that was featured.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Torrent, $this>
      */
-    public function torrent()
+    public function torrent(): BelongsTo
     {
         return $this->belongsTo(Torrent::class);
     }
 
     /**
-     * Belongs To A User.
+     * Get the user that featured the torrent.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }

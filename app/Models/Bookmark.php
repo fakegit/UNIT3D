@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,6 +19,8 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Bookmark.
@@ -25,43 +30,54 @@ use Illuminate\Database\Eloquent\Model;
  * @property int                             $torrent_id
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\Torrent $torrent
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Bookmark newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Bookmark newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Bookmark query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Bookmark whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Bookmark whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Bookmark whereTorrentId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Bookmark whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Bookmark whereUserId($value)
- * @mixin \Eloquent
  */
-class Bookmark extends Model
+#[AllowDynamicProperties]
+final class Bookmark extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\BookmarkFactory> */
+    use HasFactory;
+
     /**
-     * Belongs To A User.
+     * Get the user that owns the bookmark.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A Torrent.
+     * Get the user setting for the user that owns the bookmark.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<UserSetting, $this>
      */
-    public function torrent()
+    public function userSetting(): BelongsTo
+    {
+        return $this->belongsTo(UserSetting::class, 'user_id', 'user_id');
+    }
+
+    /**
+     * Get the history of the bookmarked torrent for the user that owns the bookmark.
+     *
+     * @return BelongsTo<History, $this>
+     */
+    public function history(): BelongsTo
+    {
+        return $this->belongsTo(History::class, 'user_id', 'user_id')->whereColumn('bookmarks.torrent_id', '=', 'history.torrent_id');
+    }
+
+    /**
+     * Get the bookmarked torrent.
+     *
+     * @return BelongsTo<Torrent, $this>
+     */
+    public function torrent(): BelongsTo
     {
         return $this->belongsTo(Torrent::class);
     }

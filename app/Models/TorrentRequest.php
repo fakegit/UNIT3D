@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,13 +16,14 @@
 
 namespace App\Models;
 
-use App\Helpers\Bbcode;
-use App\Helpers\Linkify;
-use App\Notifications\NewComment;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use voku\helper\AntiXSS;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use AllowDynamicProperties;
 
 /**
  * App\Models\TorrentRequest.
@@ -27,230 +31,213 @@ use voku\helper\AntiXSS;
  * @property int                             $id
  * @property string                          $name
  * @property int                             $category_id
- * @property string|null                     $imdb
- * @property string|null                     $tvdb
- * @property string|null                     $tmdb
- * @property string|null                     $mal
- * @property string                          $igdb
+ * @property int|null                        $imdb
+ * @property int|null                        $tvdb
+ * @property int|null                        $tmdb_movie_id
+ * @property int|null                        $tmdb_tv_id
+ * @property int|null                        $mal
+ * @property int|null                        $igdb
  * @property string                          $description
  * @property int                             $user_id
- * @property float                           $bounty
- * @property int                             $votes
- * @property int|null                        $claimed
- * @property int                             $anon
+ * @property string                          $bounty
+ * @property bool                            $anon
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property int|null                        $filled_by
- * @property string|null                     $filled_hash
+ * @property int|null                        $torrent_id
  * @property \Illuminate\Support\Carbon|null $filled_when
  * @property int                             $filled_anon
  * @property int|null                        $approved_by
  * @property \Illuminate\Support\Carbon|null $approved_when
- * @property int                             $type_id
- * @property-read \App\Models\User|null $FillUser
- * @property-read \App\Models\User|null $approveUser
- * @property-read \App\Models\Category $category
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Comment[] $comments
- * @property-read int|null $comments_count
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\TorrentRequestBounty[] $requestBounty
- * @property-read int|null $request_bounty_count
- * @property-read \App\Models\Torrent|null $torrent
- * @property-read \App\Models\Type $type
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereAnon($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereApprovedBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereApprovedWhen($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereBounty($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereCategoryId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereClaimed($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereDescription($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereFilledAnon($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereFilledBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereFilledHash($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereFilledWhen($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereIgdb($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereImdb($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereMal($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereTmdb($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereTvdb($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereTypeId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereUserId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequest whereVotes($value)
- * @mixin \Eloquent
+ * @property int|null                        $type_id
+ * @property int|null                        $resolution_id
+ * @property int|null                        $season_number
+ * @property int|null                        $episode_number
  */
-class TorrentRequest extends Model
+#[AllowDynamicProperties]
+final class TorrentRequest extends Model
 {
-    use HasFactory;
     use Auditable;
 
-    /**
-     * The Attributes That Should Be Mutated To Dates.
-     *
-     * @var array
-     */
-    protected $dates = [
-        'created_at',
-        'updated_at',
-        'filled_when',
-        'approved_when',
-    ];
+    /** @use HasFactory<\Database\Factories\TorrentRequestFactory> */
+    use HasFactory;
 
     /**
-     * The Database Table Used By The Model.
+     * The table associated with the model.
      *
      * @var string
      */
     protected $table = 'requests';
 
     /**
-     * Belongs To A User.
+     * The attributes that aren't mass assignable.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @var string[]
      */
-    public function user()
+    protected $guarded = ['id', 'created_at', 'updated_at'];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array{
+     *     filled_when: 'datetime',
+     *     approved_when: 'datetime',
+     *     tmdb_movie_id: 'int',
+     *     tmdb_tv_id: 'int',
+     *     igdb: 'int',
+     *     bounty: 'decimal:2',
+     *     anon: 'bool'
+     * }
+     */
+    protected function casts(): array
+    {
+        return [
+            'filled_when'   => 'datetime',
+            'approved_when' => 'datetime',
+            'tmdb_movie_id' => 'int',
+            'tmdb_tv_id'    => 'int',
+            'igdb'          => 'int',
+            'bounty'        => 'decimal:2',
+            'anon'          => 'bool',
+        ];
+    }
+
+    /**
+     * Get the user that owns the request.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A User.
+     * Get the approver of the request.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function approveUser()
+    public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by')->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A User.
+     * Get the filler of the request.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function FillUser()
+    public function filler(): BelongsTo
     {
         return $this->belongsTo(User::class, 'filled_by')->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A Category.
+     * Get the category associated with the request.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Category, $this>
      */
-    public function category()
+    public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
     }
 
     /**
-     * Belongs To A Type.
+     * Get the type associated with the request.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Type, $this>
      */
-    public function type()
+    public function type(): BelongsTo
     {
         return $this->belongsTo(Type::class);
     }
 
     /**
-     * Belongs To A Resolution.
+     * Get the resolution associated with the request.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Resolution, $this>
      */
-    public function resolution()
+    public function resolution(): BelongsTo
     {
         return $this->belongsTo(Resolution::class);
     }
 
     /**
-     * Belongs To A Torrent.
+     * Get the torrent that filled the request.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Torrent, $this>
      */
-    public function torrent()
+    public function torrent(): BelongsTo
     {
-        return $this->belongsTo(Torrent::class, 'filled_hash', 'info_hash');
+        return $this->belongsTo(Torrent::class);
     }
 
     /**
-     * Has Many Comments.
+     * Get the movie associated with the request.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return BelongsTo<TmdbMovie, $this>
      */
-    public function comments()
+    public function movie(): BelongsTo
     {
-        return $this->hasMany(Comment::class, 'requests_id', 'id');
+        return $this->belongsTo(TmdbMovie::class, 'tmdb_movie_id');
     }
 
     /**
-     * Has Many BON Bounties.
+     * Get the tv associated with the request.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return BelongsTo<TmdbTv, $this>
      */
-    public function requestBounty()
+    public function tv(): BelongsTo
+    {
+        return $this->belongsTo(TmdbTv::class, 'tmdb_tv_id');
+    }
+
+    /**
+     * Get the game associated with the request.
+     *
+     * @return BelongsTo<IgdbGame, $this>
+     */
+    public function game(): BelongsTo
+    {
+        return $this->belongsTo(IgdbGame::class, 'igdb');
+    }
+
+    /**
+     * Get the comments for the request.
+     *
+     * @return MorphMany<Comment, $this>
+     */
+    public function comments(): MorphMany
+    {
+        return $this->morphMany(Comment::class, 'commentable');
+    }
+
+    /**
+     * Get the bounties for the request.
+     *
+     * @return HasMany<TorrentRequestBounty, $this>
+     */
+    public function bounties(): HasMany
     {
         return $this->hasMany(TorrentRequestBounty::class, 'requests_id', 'id');
     }
 
     /**
-     * Set The Requests Description After Its Been Purified.
+     * Get the claim associated with the request.
      *
-     * @param string $value
-     *
-     * @return void
+     * @return HasOne<TorrentRequestClaim, $this>
      */
-    public function setDescriptionAttribute($value)
+    public function claim(): HasOne
     {
-        $this->attributes['description'] = \htmlspecialchars((new AntiXSS())->xss_clean($value), ENT_NOQUOTES);
-    }
-
-    /**
-     * Parse Description And Return Valid HTML.
-     *
-     * @return string Parsed BBCODE To HTML
-     */
-    public function getDescriptionHtml()
-    {
-        $bbcode = new Bbcode();
-        $linkify = new Linkify();
-
-        return $linkify->linky($bbcode->parse($this->description, true));
-    }
-
-    /**
-     * Notify Requester When A New Action Is Taken.
-     *
-     * @param $type
-     * @param $payload
-     *
-     * @return bool
-     */
-    public function notifyRequester($type, $payload)
-    {
-        $user = User::with('notification')->findOrFail($this->user_id);
-        if ($user->acceptsNotification(\auth()->user(), $user, 'request', 'show_request_comment')) {
-            $user->notify(new NewComment('request', $payload));
-
-            return true;
-        }
-
-        return true;
+        return $this->hasOne(TorrentRequestClaim::class, 'request_id');
     }
 }

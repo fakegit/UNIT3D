@@ -1,62 +1,68 @@
-@foreach ($articles as $article)
-    <div class="col-md-10 col-sm-10 col-md-offset-1">
-        @if ($article->newNews)
-                <div class="panel panel-danger">
-                    <div class="panel-heading">
-                        <h4 class="text-center">
-                            <a class="accordion-toggle collapsed" data-toggle="collapse" data-parent="#accordion"
-                                href="#collapse4" style="color:#ffffff;">
-                                @joypixels(':rotating_light:') @lang('blocks.new-news') {{ $article->created_at->diffForHumans() }} @joypixels(':rotating_light:')
-                            </a>
-                        </h4>
-                    </div>
-                @else
-                    <div class="panel panel-success">
-                        <div class="panel-heading">
-                            <h4 class="text-center">
-                                <a class="accordion-toggle collapsed" data-toggle="collapse" data-parent="#accordion"
-                                    href="#collapse4" style="color:#ffffff;">
-                                    @lang('blocks.check-news') {{ $article->created_at->diffForHumans() }}
-                                </a>
-                            </h4>
-                        </div>
-                    @endif
-                    <div aria-expanded="{{ ($article->newNews ? 'true' : 'false') }}" id="collapse4" class="panel-collapse collapse {{ ($article->newNews ? 'in' : '') }}"
-                         style="{{ ($article->newNews ? '' : 'height: 0;') }}">
-                        <div class="panel-body no-padding">
-                            <div class="news-blocks">
-                                <a href="{{ route('articles.show', ['id' => $article->id]) }}"
-                                    style=" float: right; margin-right: 10px;">
-                                    @if ( ! is_null($article->image))
-                                        <img src="{{ url('files/img/' . $article->image) }}" alt="{{ $article->title }}">
-                                    @else
-                                        <img src="{{ url('img/missing-image.png') }}" alt="{{ $article->title }}">
-                                    @endif
-                                </a>
-
-                                <h1 class="text-bold" style="display: inline ;">{{ $article->title }}</h1>
-
-                                <p class="text-muted">
-                                    <em>@lang('articles.published-at')
-                                        {{ $article->created_at->toDayDateTimeString() }}</em>
-                                </p>
-
-                                <p style="margin-top: 20px;">
-                                    @joypixels(preg_replace('#\[[^\]]+\]#', '', Str::limit($article->content), 150))...
-                                </p>
-
-                                <a href="{{ route('articles.show', ['id' => $article->id]) }}" class="btn btn-success">
-                                    @lang('articles.read-more')
-                                </a>
-
-                                <div class="pull-right">
-                                    <a href="{{ route('articles.index') }}" class="btn btn-primary">
-                                        @lang('common.view-all')
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+<section
+    class="panelV2 blocks__news"
+    x-data="{
+        show: {{ Js::from($articles->contains(fn ($article) => $article->unreads_exists)) }},
+    }"
+>
+    <header class="panel__header" x-on:click="show = !show" style="cursor: pointer">
+        <h2 class="panel__heading panel__heading--centered">
+            @if ($articles->first()?->unreads_exists)
+                @joypixels(':rotating_light:')
+                {{ __('blocks.new-news') }}
+                {{ $articles->first()?->created_at?->diffForHumans() }}
+                @joypixels(':rotating_light:')
+            @else
+                {{ __('blocks.check-news') }}
+                {{ $articles->first()?->created_at?->diffForHumans() }}
+            @endif
+        </h2>
+        <div class="panel__actions">
+            <div class="panel__action">
+                <a href="{{ route('articles.index') }}" class="form__button form__button--text">
+                    {{ __('common.view-all') }}
+                </a>
             </div>
+        </div>
+    </header>
+    <div class="panel__body article-preview-wrapper" x-cloak x-show="show">
+        @foreach ($articles as $article)
+            <article class="article-preview">
+                <header class="article-preview__header">
+                    <h2 class="article-preview__title">
+                        @if ($article->unreads_exists)
+                            <x-animation.notification />
+                        @endif
+
+                        <a
+                            class="article-preview__link"
+                            href="{{ route('articles.show', ['article' => $article]) }}"
+                        >
+                            {{ $article->title }}
+                        </a>
+                    </h2>
+                    <time
+                        class="article-preview__published-date"
+                        datetime="{{ $article->created_at }}"
+                        title="{{ $article->created_at }}"
+                    >
+                        {{ $article->created_at->diffForHumans() }}
+                    </time>
+                    <img
+                        class="article-preview__image"
+                        src="{{ $article->image ? route('authenticated_images.article_image', ['article' => $article]) : url('img/missing-image.png') }}"
+                        alt=""
+                    />
+                </header>
+                <p class="article-preview__content">
+                    @joypixels(preg_replace('#\[[^\]]+\]#', '', Str::limit(e($article->content), 500, '...'), 150))
+                </p>
+                <a
+                    href="{{ route('articles.show', ['article' => $article]) }}"
+                    class="article-preview__read-more"
+                >
+                    {{ __('articles.read-more') }}
+                </a>
+            </article>
         @endforeach
+    </div>
+</section>

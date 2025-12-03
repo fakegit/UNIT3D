@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,10 +16,10 @@
 
 namespace App\Models;
 
-use App\Helpers\Bbcode;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use voku\helper\AntiXSS;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Message.
@@ -29,32 +32,17 @@ use voku\helper\AntiXSS;
  * @property string                          $message
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\Bot|null $bot
- * @property-read \App\Models\Chatroom $chatroom
- * @property-read \App\Models\User|null $receiver
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Message newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Message newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Message query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Message whereBotId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Message whereChatroomId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Message whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Message whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Message whereMessage($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Message whereReceiverId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Message whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Message whereUserId($value)
- * @mixin \Eloquent
  */
-class Message extends Model
+#[AllowDynamicProperties]
+final class Message extends Model
 {
+    /** @use HasFactory<\Database\Factories\MessageFactory> */
     use HasFactory;
 
     /**
-     * The Attributes That Are Mass Assignable.
+     * The attributes that are mass assignable.
      *
-     * @var array
+     * @var list<string>
      */
     protected $fillable = [
         'message',
@@ -65,66 +53,42 @@ class Message extends Model
     ];
 
     /**
-     * Belongs To A Bot.
+     * Get the bot that sent the message.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Bot, $this>
      */
-    public function bot()
+    public function bot(): BelongsTo
     {
         return $this->belongsTo(Bot::class);
     }
 
     /**
-     * Belongs To A User.
+     * Get the user that sent the message.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
     /**
-     * A message belongs to a receiver.
+     * Get the user that received the message.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function receiver()
+    public function receiver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'receiver_id');
     }
 
     /**
-     * Belongs To A Chat Room.
+     * Get the chatroom the message was sent in.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Chatroom, $this>
      */
-    public function chatroom()
+    public function chatroom(): BelongsTo
     {
         return $this->belongsTo(Chatroom::class);
-    }
-
-    /**
-     * Set The Chat Message After Its Been Purified.
-     *
-     * @param string $value
-     *
-     * @return void
-     */
-    public function setMessageAttribute($value)
-    {
-        $this->attributes['message'] = \htmlspecialchars((new AntiXSS())->xss_clean($value), ENT_NOQUOTES);
-    }
-
-    /**
-     * Parse Content And Return Valid HTML.
-     *
-     * @param $message
-     *
-     * @return string Parsed BBCODE To HTML
-     */
-    public static function getMessageHtml($message)
-    {
-        return (new Bbcode())->parse($message, true);
     }
 }

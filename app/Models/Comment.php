@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,13 +16,14 @@
 
 namespace App\Models;
 
-use App\Events\TicketWentStale;
-use App\Helpers\Bbcode;
-use App\Helpers\Linkify;
 use App\Traits\Auditable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use voku\helper\AntiXSS;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Comment.
@@ -27,138 +31,90 @@ use voku\helper\AntiXSS;
  * @property int                             $id
  * @property string                          $content
  * @property int                             $anon
- * @property int|null                        $torrent_id
- * @property int|null                        $article_id
- * @property int|null                        $requests_id
- * @property int|null                        $playlist_id
  * @property int|null                        $user_id
+ * @property int|null                        $parent_id
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\Article|null $article
- * @property-read \App\Models\Playlist|null $playlist
- * @property-read \App\Models\TorrentRequest|null $request
- * @property-read \App\Models\Torrent|null $torrent
- * @property-read \App\Models\User|null $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Comment newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Comment newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Comment query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Comment whereAnon($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Comment whereArticleId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Comment whereContent($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Comment whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Comment whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Comment wherePlaylistId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Comment whereRequestsId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Comment whereTorrentId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Comment whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Comment whereUserId($value)
- * @mixin \Eloquent
+ * @property string                          $commentable_type
+ * @property int                             $commentable_id
  */
-class Comment extends Model
+#[AllowDynamicProperties]
+final class Comment extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\CommentFactory> */
+    use HasFactory;
+
     /**
-     * Belongs To A User.
+     * The attributes that aren't mass assignable.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @var string[]
      */
-    public function user()
+    protected $guarded = [];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array{anon: 'bool'}
+     */
+    protected function casts(): array
+    {
+        return [
+            'anon' => 'bool',
+        ];
+    }
+
+    /**
+     * Get the user that owns the comment.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A Torrent.
+     * Get the parent commentable model.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return MorphTo<Model, $this>
      */
-    public function torrent()
+    public function commentable(): MorphTo
     {
-        return $this->belongsTo(Torrent::class);
+        return $this->morphTo();
     }
 
     /**
-     * Belongs To A Article.
+     * Get the children comments for this comment.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return HasMany<self, $this>
      */
-    public function article()
+    public function children(): HasMany
     {
-        return $this->belongsTo(Article::class);
+        return $this->hasMany(__CLASS__, 'parent_id')->oldest();
+    }
+
+    public function isParent(): bool
+    {
+        return null === $this->parent_id;
+    }
+
+    public function isChild(): bool
+    {
+        return null !== $this->parent_id;
     }
 
     /**
-     * Belongs To A Request.
+     * Scope a query to only include parent comments.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @param Builder<Comment> $builder
      */
-    public function request()
+    public function scopeParent(Builder $builder): void
     {
-        return $this->belongsTo(TorrentRequest::class, 'requests_id', 'id');
-    }
-
-    /**
-     * Belongs To A Playlist.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     */
-    public function playlist()
-    {
-        return $this->belongsTo(Playlist::class);
-    }
-
-    /**
-     * Belongs To A Ticket.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     */
-    public function ticket()
-    {
-        return $this->belongsTo(Ticket::class);
-    }
-
-    /**
-     * Set The Comments Content After Its Been Purified.
-     *
-     * @param string $value
-     *
-     * @return void
-     */
-    public function setContentAttribute($value)
-    {
-        $this->attributes['content'] = \htmlspecialchars((new AntiXSS())->xss_clean($value), ENT_NOQUOTES);
-    }
-
-    /**
-     * Parse Content And Return Valid HTML.
-     *
-     * @return string Parsed BBCODE To HTML
-     */
-    public function getContentHtml()
-    {
-        $bbcode = new Bbcode();
-        $linkify = new Linkify();
-
-        return $linkify->linky($bbcode->parse($this->content, true));
-    }
-
-    /**
-     * Nootify Staff There Is Stale Tickets.
-     */
-    public static function checkForStale(Ticket $ticket)
-    {
-        if (empty($ticket->reminded_at) || \strtotime($ticket->reminded_at) < \strtotime('+ 3 days')) {
-            $last_comment = $ticket->comments()->orderBy('id', 'desc')->first();
-
-            if (\property_exists($last_comment, 'id') && $last_comment->id !== null && ! $last_comment->user->is_modo && \strtotime($last_comment->created_at) < \strtotime('- 3 days')) {
-                \event(new TicketWentStale($last_comment->ticket));
-            }
-        }
+        $builder->whereNull('parent_id');
     }
 }

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,12 +17,12 @@
 namespace App\Console\Commands;
 
 use App\Models\History;
-use Carbon\Carbon;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
+use Exception;
+use Illuminate\Support\Facades\DB;
+use Throwable;
 
-/**
- * @see \Tests\Unit\Console\Commands\AutoCorrectHistoryTest
- */
 class AutoCorrectHistory extends Command
 {
     /**
@@ -34,24 +37,23 @@ class AutoCorrectHistory extends Command
      *
      * @var string
      */
-    protected $description = 'Corrects History Records Said To Be Active Even Though Really Are Not Due To Not Receiving A STOPPED Event From Client.';
+    protected $description = 'Corrects history records said to be active even though really are not due to not receiving a stopped event from client.';
 
     /**
      * Execute the console command.
      *
-     * @throws \Exception
-     *
-     * @return mixed
+     * @throws Exception|Throwable If there is an error during the execution of the command.
      */
-    public function handle()
+    final public function handle(): void
     {
-        $carbon = new Carbon();
-        $history = History::select(['id', 'active', 'updated_at'])->where('active', '=', 1)->where('updated_at', '<', $carbon->copy()->subHours(2)->toDateTimeString())->get();
+        History::query()
+            ->where('active', '=', 1)
+            ->where('updated_at', '<', Carbon::now()->subHours(2))
+            ->update([
+                'active'     => 0,
+                'updated_at' => DB::raw('updated_at'),
+            ]);
 
-        foreach ($history as $h) {
-            $h->active = false;
-            $h->save();
-        }
-        $this->comment('Automated History Record Correction Command Complete');
+        $this->comment('Automated history record correction command complete');
     }
 }

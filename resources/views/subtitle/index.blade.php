@@ -1,19 +1,17 @@
 @extends('layout.default')
 
 @section('title')
-    <title>@lang('common.subtitles') - {{ config('other.title') }}</title>
+    <title>{{ __('common.subtitles') }} - {{ config('other.title') }}</title>
 @endsection
 
-@section('breadcrumb')
-    <li>
-        <a href="{{ route('subtitles.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('common.subtitles')</span>
-        </a>
+@section('breadcrumbs')
+    <li class="breadcrumb--active">
+        {{ __('common.subtitles') }}
     </li>
 @endsection
 
+@section('page', 'page__subtitle--index')
+
 @section('content')
-    <div>
-        @livewire('subtitle-search')
-    </div>
+    @livewire('subtitle-search')
 @endsection

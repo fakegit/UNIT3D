@@ -1,42 +1,36 @@
-@extends('layout.default')
+@extends('layout.with-main-and-sidebar')
 
 @section('title')
-    <title>@lang('poll.poll') - {{ config('other.title') }}</title>
+    <title>{{ __('poll.poll') }} - {{ config('other.title') }}</title>
 @endsection
 
-@section('breadcrumb')
-    <li>
-        <a href="{{ route('polls') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('poll.polls')</span>
+@section('breadcrumbs')
+    <li class="breadcrumbV2">
+        <a href="{{ route('polls.index') }}" class="breadcrumb__link">
+            {{ __('poll.polls') }}
         </a>
     </li>
-    <li>
-        <a href="{{ route('poll', ['id' => $poll->id]) }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">{{ $poll->title }}</span>
-        </a>
+    <li class="breadcrumb--active">
+        {{ $poll->title }}
     </li>
 @endsection
 
-@section('content')
-    <div class="container">
-        <div class="page-title">
-            <h1>@lang('poll.poll')</h1>
-        </div>
+@section('page', 'page__poll--show')
 
-        <div class="row">
-            <div class="col-md-12">
-                <div class="panel panel-chat">
-                    <div class="panel-heading">
-                        <h1 class="panel-title">{{ $poll->title }}</h1>
-                    </div>
-                    <div class="panel-body">
-                        @include('poll.forms.vote')
-                        @if ($poll->multiple_choice)
-                            <span class="badge-user text-bold text-red poll-note">@lang('poll.multiple-choice')</span>
-                        @endif
-                    </div>
-                </div>
-            </div>
+@section('main')
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ $poll->title }}</h2>
+        <div class="panel__body">
+            @include('poll.forms.vote')
         </div>
-    </div>
+    </section>
 @endsection
+
+@if ($poll->multiple_choice)
+    @section('sidebar')
+        <section class="panelV2">
+            <h2 class="panel__heading">{{ __('common.info') }}</h2>
+            <div class="panel__body">{{ __('poll.multiple-choice') }}</div>
+        </section>
+    @endsection
+@endif

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,7 +19,10 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use stdClass;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Rss.
@@ -25,87 +31,70 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int                             $position
  * @property string                          $name
  * @property int                             $user_id
- * @property int                             $staff_id
- * @property int                             $is_private
+ * @property bool                            $is_private
  * @property int                             $is_torrent
  * @property array                           $json_torrent
  * @property \Illuminate\Support\Carbon|null $deleted_at
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read array $expected_fields
- * @property-read string $object_torrent
- * @property-read \App\Models\User $staff
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Rss newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Rss newQuery()
- * @method static \Illuminate\Database\Query\Builder|\App\Models\Rss onlyTrashed()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Rss query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Rss whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Rss whereDeletedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Rss whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Rss whereIsPrivate($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Rss whereIsTorrent($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Rss whereJsonTorrent($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Rss whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Rss wherePosition($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Rss whereStaffId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Rss whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Rss whereUserId($value)
- * @method static \Illuminate\Database\Query\Builder|\App\Models\Rss withTrashed()
- * @method static \Illuminate\Database\Query\Builder|\App\Models\Rss withoutTrashed()
- * @mixin \Eloquent
  */
-class Rss extends Model
+#[AllowDynamicProperties]
+final class Rss extends Model
 {
-    use HasFactory;
-    use SoftDeletes;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\RssFactory> */
+    use HasFactory;
+    use SoftDeletes;
+
     /**
-     * The Database Table Used By The Model.
+     * The table associated with the mode.
      *
      * @var string
      */
     protected $table = 'rss';
 
     /**
-     * Indicates If The Model Should Be Timestamped.
+     * Get the attributes that should be cast.
      *
-     * @var bool
+     * @return array{name: 'string', json_torrent: 'array', expected_fields: 'array', is_private: 'bool'}
      */
-    public $timestamps = true;
+    protected function casts(): array
+    {
+        return [
+            'name'            => 'string',
+            'json_torrent'    => 'array',
+            'expected_fields' => 'array',
+            'is_private'      => 'bool',
+        ];
+    }
 
     /**
-     * The Attributes That Should Be Cast To Native Types.
+     * The attributes that aren't mass assignable.
      *
-     * @var array
+     * @var string[]
      */
-    protected $casts = [
-        'name'            => 'string',
-        'json_torrent'    => 'array',
-        'expected_fields' => 'array',
-    ];
+    protected $guarded = ['id', 'created_at', 'updated_at'];
 
     /**
-     * Belongs To A User.
+     * Get the user that owns the rss feed.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A Staff Member.
+     * Get the staff user that created the rss feed.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function staff()
+    public function staff(): BelongsTo
     {
         // Not needed yet. Just added for future extendability.
         return $this->belongsTo(User::class, 'staff_id');
@@ -113,16 +102,14 @@ class Rss extends Model
 
     /**
      * Get the RSS feeds JSON Torrent as object.
-     *
-     * @return string
      */
-    public function getObjectTorrentAttribute()
+    public function getObjectTorrentAttribute(): stdClass|bool
     {
         // Went with attribute to avoid () calls in views. Uniform ->object_torrent vs ->json_torrent.
         if ($this->json_torrent) {
             $expected = $this->expected_fields;
 
-            return (object) \array_merge($expected, $this->json_torrent);
+            return (object) array_merge($expected, $this->json_torrent);
         }
 
         return false;
@@ -131,14 +118,31 @@ class Rss extends Model
     /**
      * Get the RSS feeds expected fields for form validation.
      *
-     * @return array
+     * @return array<string, null>
      */
-    public function getExpectedFieldsAttribute()
+    public function getExpectedFieldsAttribute(): array
     {
         // Just Torrents for now... extendable to check on feed type in future.
-        return ['search'             => null, 'description' => null, 'uploader' => null, 'imdb' => null,
-            'mal'                    => null, 'categories' => null, 'types' => null, 'resolutions' => null, 'genres' => null,
-            'freeleech'              => null, 'doubleupload' => null, 'featured' => null, 'stream' => null, 'highspeed' => null,
-            'internal'               => null, 'alive' => null, 'dying' => null, 'dead' => null, 'sd' => null, ];
+        return [
+            'search'          => null,
+            'description'     => null,
+            'uploader'        => null,
+            'imdb'            => null,
+            'mal'             => null,
+            'categories'      => null,
+            'types'           => null,
+            'resolutions'     => null,
+            'genres'          => null,
+            'freeleech'       => null,
+            'doubleupload'    => null,
+            'featured'        => null,
+            'highspeed'       => null,
+            'internal'        => null,
+            'personalrelease' => null,
+            'bookmark'        => null,
+            'alive'           => null,
+            'dying'           => null,
+            'dead'            => null,
+        ];
     }
 }

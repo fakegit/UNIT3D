@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,176 +16,158 @@
 
 namespace App\Models;
 
-use App\Helpers\Bbcode;
-use App\Helpers\Linkify;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use voku\helper\AntiXSS;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Post.
  *
  * @property int                             $id
  * @property string                          $content
+ * @property bool                            $anon
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property int                             $user_id
  * @property int                             $topic_id
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Like[] $likes
- * @property-read int|null $likes_count
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\BonTransactions[] $tips
- * @property-read int|null $tips_count
- * @property-read \App\Models\Topic $topic
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Post newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Post newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Post query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Post whereContent($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Post whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Post whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Post whereTopicId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Post whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Post whereUserId($value)
- * @mixin \Eloquent
  */
-class Post extends Model
+#[AllowDynamicProperties]
+final class Post extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\PostFactory> */
+    use HasFactory;
+
     /**
-     * Belongs To A Topic.
+     * The attributes that are mass assignable.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @var list<string>
      */
-    public function topic()
+    protected $fillable = [
+        'content',
+        'anon',
+        'topic_id',
+        'user_id',
+    ];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array{anon: 'bool'}
+     */
+    protected function casts(): array
+    {
+        return [
+            'anon' => 'bool',
+        ];
+    }
+
+    /**
+     * Get the topic that owns the post.
+     *
+     * @return BelongsTo<Topic, $this>
+     */
+    public function topic(): BelongsTo
     {
         return $this->belongsTo(Topic::class);
     }
 
     /**
-     * Belongs To A User.
+     * Get the user that wrote the post.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * A Post Has Many Likes.
+     * Get all likes for the post.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<Like, $this>
      */
-    public function likes()
+    public function likes(): HasMany
     {
         return $this->hasMany(Like::class)->where('like', '=', 1);
     }
 
     /**
-     * A Post Has Many Dislikes.
+     * Get all dislikes for the post.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<Like, $this>
      */
-    public function dislikes()
+    public function dislikes(): HasMany
     {
         return $this->hasMany(Like::class)->where('dislike', '=', 1);
     }
 
     /**
-     * A Post Has Many Tips.
+     * Get all tips for the post.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<PostTip, $this>
      */
-    public function tips()
+    public function tips(): HasMany
     {
-        return $this->hasMany(BonTransactions::class);
+        return $this->hasMany(PostTip::class);
     }
 
     /**
-     * Set The Posts Content After Its Been Purified.
+     * Get all the posts for the post's author.
      *
-     * @param string $value
-     *
-     * @return void
+     * @return HasMany<Post, $this>
      */
-    public function setContentAttribute($value)
+    public function authorPosts(): HasMany
     {
-        $this->attributes['content'] = \htmlspecialchars((new AntiXSS())->xss_clean($value), ENT_NOQUOTES);
+        return $this->hasMany(Post::class, 'user_id', 'user_id');
     }
 
     /**
-     * Parse Content And Return Valid HTML.
+     * Get all the topics for the post's author.
      *
-     * @return string Parsed BBCODE To HTML
+     * @return HasMany<Topic, $this>
      */
-    public function getContentHtml()
+    public function authorTopics(): HasMany
     {
-        $bbcode = new Bbcode();
-        $linkify = new Linkify();
-
-        return $linkify->linky($bbcode->parse($this->content, true));
+        return $this->hasMany(Topic::class, 'first_post_user_id', 'user_id');
     }
 
     /**
-     * Post Trimming.
+     * Only include posts a user is authorized to.
      *
-     * @param int  $length
-     * @param bool $ellipses
-     * @param bool $stripHtml
-     *
-     * @return string Formatted And Trimmed Content
+     * @param  \Illuminate\Database\Eloquent\Builder<self> $query
+     * @return \Illuminate\Database\Eloquent\Builder<self>
      */
-    public function getBrief($length = 100, $ellipses = true, $stripHtml = false)
-    {
-        $input = $this->content;
-        //strip tags, if desired
-        if ($stripHtml) {
-            $input = \strip_tags($input);
-        }
-
-        //no need to trim, already shorter than trim length
-        if (\strlen($input) <= $length) {
-            return $input;
-        }
-
-        //find last space within length
-        $lastSpace = \strrpos(\substr($input, 0, $length), ' ');
-        $trimmedText = \substr($input, 0, $lastSpace);
-
-        //add ellipses (...)
-        if ($ellipses) {
-            $trimmedText .= '...';
-        }
-
-        return $trimmedText;
-    }
-
-    /**
-     * Get A Post From A ID.
-     *
-     * @return string
-     */
-    public function getPostNumber()
-    {
-        return $this->topic->postNumberFromId($this->id);
-    }
-
-    /**
-     * Get A Posts Page Number.
-     *
-     * @return string
-     */
-    public function getPageNumber()
-    {
-        $result = ($this->getPostNumber() - 1) / 25 + 1;
-
-        return \floor($result);
+    public function scopeAuthorized(
+        \Illuminate\Database\Eloquent\Builder $query,
+        ?bool $canReadTopic = null,
+        ?bool $canReplyTopic = null,
+        ?bool $canStartTopic = null,
+    ): \Illuminate\Database\Eloquent\Builder {
+        return $query->whereNotIn(
+            'topic_id',
+            Topic::query()
+                ->whereRelation(
+                    'forumPermissions',
+                    fn ($query) => $query
+                        ->where('group_id', '=', auth()->user()->group_id)
+                        ->where(
+                            fn ($query) => $query
+                                ->whereRaw('1 = 0')
+                                ->when($canReadTopic !== null, fn ($query) => $query->orWhere('read_topic', '!=', $canReadTopic))
+                                ->when($canReplyTopic !== null, fn ($query) => $query->orWhere('reply_topic', '!=', $canReplyTopic))
+                                ->when($canStartTopic !== null, fn ($query) => $query->orWhere('start_topic', '!=', $canStartTopic))
+                        )
+                )
+                ->when($canReplyTopic && !auth()->user()->group->is_modo, fn ($query) => $query->where('state', '=', 'open'))
+                ->select('id')
+        );
     }
 }

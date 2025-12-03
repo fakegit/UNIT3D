@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,50 +19,48 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use AllowDynamicProperties;
 
 /**
- * App\Models\Group.
+ * App\Models\Internal.
  *
  * @property int    $id
  * @property string $name
  * @property string $icon
  * @property string $effect
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Internal newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Internal newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Inernal query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Internal whereIcon($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Internal whereEffect($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Internal whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Internal whereName($value)
- * @mixin \Eloquent
  */
-class Internal extends Model
+#[AllowDynamicProperties]
+final class Internal extends Model
 {
-    use HasFactory;
     use Auditable;
 
-    /**
-     * The Attributes That Aren't Mass Assignable.
-     *
-     * @var array
-     */
-    protected $guarded = ['id'];
+    /** @use HasFactory<\Database\Factories\InternalFactory> */
+    use HasFactory;
 
     /**
-     * Indicates If The Model Should Be Timestamped.
+     * The attributes that aren't mass assignable.
+     *
+     * @var string[]
+     */
+    protected $guarded = ['id', 'created_at', 'updated_at'];
+
+    /**
+     * Indicates if the model should be timestamped.
      *
      * @var bool
      */
     public $timestamps = false;
 
     /**
-     * Has Many Users.
+     * Get the users that belong to the internal group.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return BelongsToMany<User, $this, InternalUser>
      */
-    public function users()
+    public function users(): BelongsToMany
     {
-        return $this->hasMany(User::class);
+        return $this->belongsToMany(User::class)
+            ->using(InternalUser::class)
+            ->withPivot('id', 'position', 'created_at');
     }
 }

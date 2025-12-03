@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,60 +17,50 @@
 namespace App\Observers;
 
 use App\Models\User;
+use Exception;
 
 class UserObserver
 {
     /**
      * Handle the User "created" event.
-     *
-     *
-     * @return void
      */
-    public function created(User $user)
+    public function created(User $user): void
     {
         //\cache()->put(\sprintf('user:%s', $user->passkey), $user);
     }
 
     /**
-     * Handle the User "updated" event.
+     * Handle the User "saved" event.
      *
      *
-     * @return void
+     * @throws Exception
      */
-    public function updated(User $user)
+    public function saved(User $user): void
     {
         //\cache()->put(\sprintf('user:%s', $user->passkey), $user);
+        cache()->forget('cachedUser.'.$user->id);
     }
 
     /**
      * Handle the User "retrieved" event.
-     *
-     *
-     * @return void
      */
-    public function retrieved(User $user)
+    public function retrieved(User $user): void
     {
         //\cache()->add(\sprintf('user:%s', $user->passkey), $user);
     }
 
     /**
      * Handle the User "deleted" event.
-     *
-     *
-     * @return void
      */
-    public function deleted(User $user)
+    public function deleted(User $user): void
     {
         //\cache()->forget(\sprintf('user:%s', $user->passkey));
     }
 
     /**
      * Handle the User "restored" event.
-     *
-     *
-     * @return void
      */
-    public function restored(User $user)
+    public function restored(User $user): void
     {
         //\cache()->put(\sprintf('user:%s', $user->passkey), $user);
     }

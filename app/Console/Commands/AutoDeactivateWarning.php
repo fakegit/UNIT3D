@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,14 +16,15 @@
 
 namespace App\Console\Commands;
 
-use App\Models\PrivateMessage;
 use App\Models\Warning;
+use App\Notifications\UserWarningExpired;
+use App\Services\Unit3dAnnounce;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+use Throwable;
 
-/**
- * @see \Tests\Unit\Console\Commands\AutoDeactivateWarningTest
- */
 class AutoDeactivateWarning extends Command
 {
     /**
@@ -35,31 +39,62 @@ class AutoDeactivateWarning extends Command
      *
      * @var string
      */
-    protected $description = 'Automatically Deactivates User Warnings If Expired';
+    protected $description = 'Automatically deactivates user warnings if expired';
 
     /**
      * Execute the console command.
      *
-     * @return mixed
+     * @throws Exception|Throwable If there is an error during the execution of the command.
      */
-    public function handle()
+    final public function handle(): void
     {
         $current = Carbon::now();
-        $warnings = Warning::with(['warneduser', 'torrenttitle'])->where('active', '=', 1)->where('expires_on', '<', $current)->get();
 
-        foreach ($warnings as $warning) {
-            // Set Records Active To 0 in warnings table
-            $warning->active = '0';
-            $warning->save();
+        $usersWithExpiredWarnings = [];
 
-            // Send Private Message
-            $pm = new PrivateMessage();
-            $pm->sender_id = 1;
-            $pm->receiver_id = $warning->warneduser->id;
-            $pm->subject = 'Hit and Run Warning Deactivated';
-            $pm->message = 'The [b]WARNING[/b] you received relating to Torrent '.$warning->torrenttitle->name.' has expired! Try not to get more! [color=red][b]THIS IS AN AUTOMATED SYSTEM MESSAGE, PLEASE DO NOT REPLY![/b][/color]';
-            $pm->save();
+        Warning::query()
+            ->where('active', '=', true)
+            ->where(
+                fn ($query) => $query
+                    ->where('expires_on', '<=', $current)
+                    ->orWhereHas(
+                        'torrent.history',
+                        fn ($query) => $query
+                            ->whereColumn('history.user_id', '=', 'warnings.user_id')
+                            ->where('history.seedtime', '>=', config('hitrun.seedtime'))
+                    )
+            )
+            ->chunkById(100, function ($warnings) use (&$usersWithExpiredWarnings): void {
+                foreach ($warnings as $warning) {
+                    // Set Records Active To 0 in warnings table
+                    $warning->update(['active' => false]);
+
+                    // Add user to usersWithExpiredWarnings array
+                    $usersWithExpiredWarnings[$warning->user_id] = $warning->user;
+                }
+            });
+
+        // Send a single notification for each user with expired warnings
+        foreach ($usersWithExpiredWarnings as $user) {
+            $user->notify(new UserWarningExpired($user));
         }
-        $this->comment('Automated Warning Deativation Command Complete');
+
+        // Calculate User Warning Count and Enable DL Priv If Required.
+        Warning::with('user')
+            ->select(DB::raw('user_id, SUM(active = TRUE) as value'))
+            ->groupBy('user_id')
+            ->having('value', '<', config('hitrun.max_warnings'))
+            ->whereRelation('user', 'can_download', '=', false)
+            ->chunkById(100, function ($warnings): void {
+                foreach ($warnings as $warning) {
+                    $warning->user->update(['can_download' => 1]);
+
+                    cache()->forget('user:'.$warning->user->passkey);
+
+                    Unit3dAnnounce::addUser($warning->user);
+                }
+            }, 'user_id');
+
+        $this->comment('Automated warning deactivation command complete');
     }
 }

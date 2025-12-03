@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,126 +16,89 @@
 
 namespace App\Models;
 
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Kyslik\ColumnSortable\Sortable;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Peer.
  *
  * @property int                             $id
- * @property string|null                     $peer_id
- * @property string|null                     $md5_peer_id
- * @property string|null                     $info_hash
- * @property string|null                     $ip
- * @property int|null                        $port
- * @property string|null                     $agent
- * @property int|null                        $uploaded
- * @property int|null                        $downloaded
- * @property int|null                        $left
- * @property int|null                        $seeder
+ * @property mixed                           $peer_id
+ * @property mixed                           $ip
+ * @property int                             $port
+ * @property string                          $agent
+ * @property int                             $uploaded
+ * @property int                             $downloaded
+ * @property int                             $left
+ * @property bool                            $seeder
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property int|null                        $torrent_id
- * @property int|null                        $user_id
+ * @property int                             $torrent_id
+ * @property int                             $user_id
  * @property bool                            $connectable
- * @property-read \App\Models\Torrent $seed
- * @property-read \App\Models\Torrent|null $torrent
- * @property-read \App\Models\User|null $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer sortable($defaultParameters = null)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer whereAgent($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer whereDownloaded($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer whereInfoHash($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer whereIp($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer whereLeft($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer whereMd5PeerId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer wherePeerId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer wherePort($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer whereSeeder($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer whereTorrentId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer whereUploaded($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Peer whereUserId($value)
- * @mixin \Eloquent
+ * @property bool                            $active
  */
-class Peer extends Model
+#[AllowDynamicProperties]
+final class Peer extends Model
 {
+    /** @use HasFactory<\Database\Factories\PeerFactory> */
     use HasFactory;
-    use Sortable;
 
     /**
-     * The Columns That Are Sortable.
+     * Get the attributes that should be cast.
      *
-     * @var array
+     * @return array{active: 'bool', seeder: 'bool', connectable: 'bool'}
      */
-    public $sortable = [
-        'id',
-        'agent',
-        'uploaded',
-        'downloaded',
-        'left',
-        'seeder',
-        'created_at',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'active'      => 'bool',
+            'seeder'      => 'bool',
+            'connectable' => 'bool',
+        ];
+    }
 
     /**
-     * Belongs To A User.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * Prepare a date for array / JSON serialization.
      */
-    public function user()
+    protected function serializeDate(DateTimeInterface $date): string
+    {
+        return $date->format('Y-m-d H:i:s');
+    }
+
+    /**
+     * Get the user associated with the peer.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A Torrent.
+     * Get the torrent associated with the peer.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Torrent, $this>
      */
-    public function torrent()
+    public function torrent(): BelongsTo
     {
         return $this->belongsTo(Torrent::class);
     }
 
     /**
-     * Belongs To A Seed.
+     * Get the torrent associated with the peer.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Torrent, $this>
      */
-    public function seed()
+    public function seed(): BelongsTo
     {
         return $this->belongsTo(Torrent::class, 'torrents.id', 'torrent_id');
-    }
-
-    /**
-     * Updates Connectable State If Needed.
-     *
-     * @throws \Psr\SimpleCache\InvalidArgumentException
-     * @throws \Exception
-     *
-     * @var resource
-     */
-    public function updateConnectableStateIfNeeded(): void
-    {
-        if (! \cache()->has('peers:connectable:'.$this->ip.'-'.$this->port.'-'.$this->agent)) {
-            $con = @fsockopen($this->ip, $this->port, $_, $_, 1);
-
-            $this->connectable = \is_resource($con);
-            \cache()->put('peers:connectable:'.$this->ip.'-'.$this->port.'-'.$this->agent, $this->connectable, now()->addDay());
-
-            if (\is_resource($con)) {
-                \fclose($con);
-            }
-        }
     }
 }

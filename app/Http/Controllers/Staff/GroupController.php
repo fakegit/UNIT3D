@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,10 +17,12 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
-use App\Models\Forum;
+use App\Http\Requests\Staff\StoreGroupRequest;
+use App\Http\Requests\Staff\UpdateGroupRequest;
+use App\Models\ForumCategory;
 use App\Models\Group;
-use App\Models\Permission;
-use Illuminate\Http\Request;
+use App\Services\Unit3dAnnounce;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Str;
 
 /**
@@ -28,159 +33,108 @@ class GroupController extends Controller
     /**
      * Display All Groups.
      */
-    public function index(Request $request): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $user = $request->user();
-        \abort_unless($user->group->is_admin, 403);
-
-        $groups = Group::all()->sortBy('position');
-
-        return \view('Staff.group.index', ['groups' => $groups]);
+        return view('Staff.group.index', [
+            'groups' => Group::orderBy('position')->get(),
+        ]);
     }
 
     /**
      * Group Add Form.
      */
-    public function create(Request $request): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    public function create(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $user = $request->user();
-        \abort_unless($user->group->is_admin, 403);
-
-        return \view('Staff.group.create');
+        return view('Staff.group.create', [
+            'forumCategories' => ForumCategory::query()
+                ->with([
+                    'forums' => fn ($query) => $query->orderBy('position')
+                ])
+                ->orderBy('position')
+                ->get(),
+        ]);
     }
 
     /**
      * Store A New Group.
-     *
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function store(Request $request)
+    public function store(StoreGroupRequest $request): \Illuminate\Http\RedirectResponse
     {
-        $user = $request->user();
-        \abort_unless($user->group->is_admin, 403);
+        $group = Group::create(['slug' => Str::slug($request->validated('group.name'))] + $request->validated('group'));
 
-        $group = new Group();
-        $group->name = $request->input('name');
-        $group->slug = Str::slug($request->input('name'));
-        $group->position = $request->input('position');
-        $group->level = $request->input('level');
-        $group->color = $request->input('color');
-        $group->icon = $request->input('icon');
-        $group->effect = $request->input('effect');
-        $group->is_internal = $request->input('is_internal');
-        $group->is_modo = $request->input('is_modo');
-        $group->is_admin = $request->input('is_admin');
-        $group->is_owner = $request->input('is_owner');
-        $group->is_trusted = $request->input('is_trusted');
-        $group->is_immune = $request->input('is_immune');
-        $group->is_freeleech = $request->input('is_freeleech');
-        $group->is_double_upload = $request->input('is_double_upload');
-        $group->is_incognito = $request->input('is_incognito');
-        $group->can_upload = $request->input('can_upload');
-        $group->autogroup = $request->input('autogroup');
+        $group->permissions()->upsert($request->validated('permissions'), ['forum_id', 'group_id']);
 
-        $v = \validator($group->toArray(), [
-            'name'     => 'required|unique:groups',
-            'slug'     => 'required|unique:groups',
-            'position' => 'required',
-            'color'    => 'required',
-            'icon'     => 'required',
-        ]);
+        Unit3dAnnounce::addGroup($group);
 
-        if (! $request->user()->group->is_owner && $request->input('is_owner') == 1) {
-            return \redirect()->route('staff.groups.index')
-                ->withErrors('You are not permitted to create a group with owner permissions!');
-        }
-
-        if ($v->fails()) {
-            return \redirect()->route('staff.groups.index')
-                ->withErrors($v->errors());
-        }
-        $group->save();
-        foreach (Forum::all()->pluck('id') as $collection) {
-            $permission = new Permission();
-            $permission->forum_id = $collection;
-            $permission->group_id = $group->id;
-            $permission->show_forum = 1;
-            $permission->read_topic = 1;
-            $permission->reply_topic = 1;
-            $permission->start_topic = 1;
-            $permission->save();
-        }
-
-        return \redirect()->route('staff.groups.index')
-            ->withSuccess('Group Was Created Successfully!');
+        return to_route('staff.groups.index')
+            ->with('success', 'Group was created successfully!');
     }
 
     /**
      * Group Edit Form.
-     *
-     * @param \App\Models\Group $id
      */
-    public function edit(Request $request, $id): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    public function edit(Group $group): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $user = $request->user();
-        \abort_unless($user->group->is_admin, 403);
-
-        $group = Group::findOrFail($id);
-
-        return \view('Staff.group.edit', ['group' => $group]);
+        return view('Staff.group.edit', [
+            'group'           => $group,
+            'forumCategories' => ForumCategory::query()
+                ->with([
+                    'forums' => fn ($query) => $query->orderBy('position')
+                ])
+                ->orderBy('position')
+                ->get(),
+        ]);
     }
 
     /**
      * Edit A Group.
-     *
-     * @param \App\Models\Group $id
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function update(Request $request, $id)
+    public function update(UpdateGroupRequest $request, Group $group): \Illuminate\Http\RedirectResponse
     {
-        $user = $request->user();
-        \abort_unless($user->group->is_admin, 403);
+        $group->update(['slug' => Str::slug($request->validated('group.name'))] + $request->validated('group'));
 
-        $group = Group::findOrFail($id);
+        $group->permissions()->upsert($request->validated('permissions'), ['forum_id', 'group_id']);
 
-        $group->name = $request->input('name');
-        $group->slug = Str::slug($request->input('name'));
-        $group->position = $request->input('position');
-        $group->level = $request->input('level');
-        $group->color = $request->input('color');
-        $group->icon = $request->input('icon');
-        $group->effect = $request->input('effect');
-        $group->is_internal = $request->input('is_internal');
-        $group->is_modo = $request->input('is_modo');
-        $group->is_admin = $request->input('is_admin');
-        $group->is_owner = $request->input('is_owner');
-        $group->is_trusted = $request->input('is_trusted');
-        $group->is_immune = $request->input('is_immune');
-        $group->is_freeleech = $request->input('is_freeleech');
-        $group->is_double_upload = $request->input('is_double_upload');
-        $group->is_incognito = $request->input('is_incognito');
-        $group->can_upload = $request->input('can_upload');
-        $group->autogroup = $request->input('autogroup');
+        cache()->forget('group:'.$group->id);
 
-        $v = \validator($group->toArray(), [
-            'name'     => 'required',
-            'slug'     => 'required',
-            'position' => 'required',
-            'color'    => 'required',
-            'icon'     => 'required',
-        ]);
+        Unit3dAnnounce::addGroup($group);
 
-        if (! $request->user()->group->is_owner && $request->input('is_owner') == 1) {
-            return \redirect()->route('staff.groups.index')
-                ->withErrors('You are not permitted to give a group owner permissions!');
+        return to_route('staff.groups.index')
+            ->with('success', 'Group was updated successfully!');
+    }
+
+    /**
+     * Delete A Group.
+     */
+    public function destroy(Group $group): \Illuminate\Http\RedirectResponse
+    {
+        if ($group->system_required) {
+            return to_route('staff.groups.index')
+                ->with('error', 'Cannot delete system required group: '.$group->name);
         }
 
-        if ($v->fails()) {
-            return \redirect()->route('staff.groups.index')
-                ->withErrors($v->errors());
-        }
-        $group->save();
+        if ($group->users()->exists()) {
+            $userIds = $group->users()->pluck('id')->toArray();
 
-        return \redirect()->route('staff.groups.index')
-            ->withSuccess('Group Was Updated Successfully!');
+            $defaultGroup = Group::query()
+                ->where('system_required', true)
+                ->where('name', '=', 'User')
+                ->first();
+
+            if ($defaultGroup === null) {
+                return to_route('staff.groups.index')
+                    ->with('error', 'Cannot find default User group to reassign users.');
+            }
+
+            $group->users()->update(['group_id' => $defaultGroup->id]);
+
+            Artisan::call('auto:group', ['user_ids' => $userIds]);
+        }
+
+        Unit3dAnnounce::removeGroup($group);
+        $group->delete();
+
+        return to_route('staff.groups.index')
+            ->with('success', "Group deleted successfully.");
     }
 }

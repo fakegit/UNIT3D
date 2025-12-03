@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -27,9 +30,13 @@ use App\Achievements\UserMade900Posts;
 use App\Achievements\UserMadeFirstPost;
 use App\Models\Post;
 use App\Models\Topic;
+use App\Models\User;
+use App\Notifications\NewPost;
+use App\Notifications\NewPostTag;
 use App\Repositories\ChatRepository;
-use App\Repositories\TaggedUserRepository;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
+use Exception;
 
 /**
  * @see \Tests\Todo\Feature\Http\Controllers\PostControllerTest
@@ -39,143 +46,153 @@ class PostController extends Controller
     /**
      * PostController Constructor.
      */
-    public function __construct(private TaggedUserRepository $taggedUserRepository, private ChatRepository $chatRepository)
+    public function __construct(private readonly ChatRepository $chatRepository)
     {
+    }
+
+    /**
+     * Posts Index.
+     */
+    public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    {
+        return view('forum.post.index');
     }
 
     /**
      * Store A New Post To A Topic.
-     *
-     * @param \App\Models\Topic $id
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function reply(Request $request, $id)
+    public function store(Request $request): \Illuminate\Http\RedirectResponse
     {
-        $user = $request->user();
-        $topic = Topic::findOrFail($id);
-        $forum = $topic->forum;
-        $category = $forum->getCategory();
-
-        // The user has the right to create a post here?
-        if (! $category->getPermission()->reply_topic || ($topic->state == 'close' && ! $request->user()->group->is_modo)) {
-            return \redirect()->route('forums.index')
-                ->withErrors('You Cannot Reply To This Topic!');
-        }
-
-        $post = new Post();
-        $post->content = $request->input('content');
-        $post->user_id = $user->id;
-        $post->topic_id = $topic->id;
-
-        $v = \validator($post->toArray(), [
+        $request->validate([
             'content'  => 'required|min:1',
-            'user_id'  => 'required',
-            'topic_id' => 'required',
+            'topic_id' => 'required|integer',
+            'anon'     => 'sometimes|boolean',
         ]);
 
-        if ($v->fails()) {
-            return \redirect()->route('forum_topic', ['id' => $topic->id])
-                ->withErrors($v->errors());
-        }
-        $post->save();
-        $appurl = \config('app.url');
-        $href = \sprintf('%s/forums/topics/%s?page=%s#post-%s', $appurl, $topic->id, $post->getPageNumber(), $post->id);
-        $message = \sprintf('%s has tagged you in a forum post. You can view it [url=%s] HERE [/url]', $user->username, $href);
-        if ($this->taggedUserRepository->hasTags($request->input('content'))) {
-            if ($this->taggedUserRepository->contains($request->input('content'), '@here') && $user->group->is_modo) {
-                $users = \collect([]);
+        $user = $request->user();
 
-                $topic->posts()->get()->each(function ($p) use ($users) {
-                    $users->push($p->user);
-                });
+        $topic = Topic::authorized(canReplyTopic: true)->findOrFail($request->integer('topic_id'));
 
-                $this->taggedUserRepository->messagePostUsers(
-                    'forum',
-                    $users,
-                    $user,
-                    'Staff',
-                    $post
-                );
-            } else {
-                $this->taggedUserRepository->messageTaggedPostUsers(
-                    'forum',
-                    $request->input('content'),
-                    $user,
-                    $user->username,
-                    $post
-                );
+        $forum = $topic->forum;
+
+        $post = Post::create([
+            'content'  => $request->input('content'),
+            'anon'     => $request->boolean('anon'),
+            'user_id'  => $user->id,
+            'topic_id' => $topic->id,
+        ]);
+
+        $topic->update([
+            'last_post_id'         => $post->id,
+            'last_post_user_id'    => $user->id,
+            'num_post'             => $topic->posts()->count(),
+            'last_post_created_at' => $post->created_at,
+        ]);
+
+        $forum->update([
+            'num_post'             => $forum->posts()->count(),
+            'num_topic'            => $forum->topics()->count(),
+            'last_post_user_id'    => $user->id,
+            'last_post_id'         => $post->id,
+            'last_topic_id'        => $topic->id,
+            'last_post_created_at' => $post->created_at,
+        ]);
+
+        // Post To Chatbox and Notify Subscribers
+        $appUrl = config('app.url');
+        $postUrl = \sprintf('%s/forums/topics/%s/posts/%s', $appUrl, $topic->id, $post->id);
+        $realUrl = \sprintf('/forums/topics/%s/posts/%s', $topic->id, $post->id);
+        $profileUrl = \sprintf('%s/users/%s', $appUrl, $user->username);
+
+        if (config('other.staff-forum-notify') && ($forum->id == config('other.staff-forum-id') || $forum->forum_category_id == config('other.staff-forum-id'))) {
+            $staffers = User::query()
+                ->where('id', '!=', $user->id)
+                ->whereRelation('forumPermissions', [
+                    ['read_topic', '=', 1],
+                    ['forum_id', '=', $forum->id],
+                ])
+                ->get();
+
+            foreach ($staffers as $staffer) {
+                $staffer->notify(new NewPost('staff', $user, $post));
             }
-        }
-        // Save last post user data to topic table
-        $topic->last_post_user_id = $user->id;
-        $topic->last_post_user_username = $user->username;
-        // Count post in topic
-        $topic->num_post = Post::where('topic_id', '=', $topic->id)->count();
-        // Update time
-        $topic->last_reply_at = $post->created_at;
-        // Save
-        $topic->save();
-        // Count posts
-        $forum->num_post = $forum->getPostCount($forum->id);
-        // Count topics
-        $forum->num_topic = $forum->getTopicCount($forum->id);
-        // Save last post user data to the forum table
-        $forum->last_post_user_id = $user->id;
-        $forum->last_post_user_username = $user->username;
-        // Save last topic data to the forum table
-        $forum->last_topic_id = $topic->id;
-        $forum->last_topic_name = $topic->name;
-        // Save
-        $forum->save();
-        // Post To Chatbox
-        $appurl = \config('app.url');
-        $postUrl = \sprintf('%s/forums/topics/%s?page=%s#post-%s', $appurl, $topic->id, $post->getPageNumber(), $post->id);
-        $realUrl = \sprintf('/forums/topics/%s?page=%s#post-%s', $topic->id, $post->getPageNumber(), $post->id);
-        $profileUrl = \sprintf('%s/users/%s', $appurl, $user->username);
-
-        if (\config('other.staff-forum-notify') && ($forum->id == \config('other.staff-forum-id') || $forum->parent_id == \config('other.staff-forum-id'))) {
-            $topic->notifyStaffers($user, $topic, $post);
         } else {
-            $this->chatRepository->systemMessage(\sprintf('[url=%s]%s[/url] has left a reply on topic [url=%s]%s[/url]', $profileUrl, $user->username, $postUrl, $topic->name));
-            // Notify All Subscribers Of New Reply
-            if ($topic->first_user_poster_id != $user->id) {
-                $topic->notifyStarter($user, $topic, $post);
-            }
-            $topic->notifySubscribers($user, $topic, $post);
-        }
-        //Achievements
-        $user->unlock(new UserMadeFirstPost(), 1);
-        $user->addProgress(new UserMade25Posts(), 1);
-        $user->addProgress(new UserMade50Posts(), 1);
-        $user->addProgress(new UserMade100Posts(), 1);
-        $user->addProgress(new UserMade200Posts(), 1);
-        $user->addProgress(new UserMade300Posts(), 1);
-        $user->addProgress(new UserMade400Posts(), 1);
-        $user->addProgress(new UserMade500Posts(), 1);
-        $user->addProgress(new UserMade600Posts(), 1);
-        $user->addProgress(new UserMade700Posts(), 1);
-        $user->addProgress(new UserMade800Posts(), 1);
-        $user->addProgress(new UserMade900Posts(), 1);
+            $isChatboxPrivy = $forum->permissions()
+                ->where('read_topic', '=', true)
+                ->whereRelation('group', 'slug', '=', 'user')
+                ->exists();
 
-        return \redirect()->to($realUrl)
-            ->withSuccess('Post Successfully Posted');
+            if ($isChatboxPrivy) {
+                if ($post->anon) {
+                    $this->chatRepository->systemMessage(\sprintf('An anonymous user has left a reply on topic [url=%s]%s[/url]', $postUrl, $topic->name));
+                } else {
+                    $this->chatRepository->systemMessage(\sprintf('[url=%s]%s[/url] has left a reply on topic [url=%s]%s[/url]', $profileUrl, $user->username, $postUrl, $topic->name));
+                }
+            }
+
+            $topicStarter = $topic->user;
+
+            // Notify All Subscribers Of New Reply
+            $topicStarter->notify(new NewPost('topic', $user, $post));
+
+            $subscribers = User::query()
+                ->where('id', '!=', $user->id)
+                ->whereRelation('subscriptions', 'topic_id', '=', $topic->id)
+                ->whereRelation('forumPermissions', [
+                    ['read_topic', '=', 1],
+                    ['forum_id', '=', $topic->forum_id],
+                ])
+                ->where(
+                    fn ($query) => $query
+                        ->whereRelation('notification', 'show_subscription_topic', '=', true)
+                        ->orDoesntHave('notification')
+                )
+                ->get();
+
+            foreach ($subscribers as $subscriber) {
+                $subscriber->notify(new NewPost('subscription', $user, $post));
+            }
+
+            // Achievements
+            $user->unlock(new UserMadeFirstPost());
+            $user->addProgress(new UserMade25Posts(), 1);
+            $user->addProgress(new UserMade50Posts(), 1);
+            $user->addProgress(new UserMade100Posts(), 1);
+            $user->addProgress(new UserMade200Posts(), 1);
+            $user->addProgress(new UserMade300Posts(), 1);
+            $user->addProgress(new UserMade400Posts(), 1);
+            $user->addProgress(new UserMade500Posts(), 1);
+            $user->addProgress(new UserMade600Posts(), 1);
+            $user->addProgress(new UserMade700Posts(), 1);
+            $user->addProgress(new UserMade800Posts(), 1);
+            $user->addProgress(new UserMade900Posts(), 1);
+        }
+
+        // User Tagged Notification
+        preg_match_all('/@([\w\-]+)/', (string) $post->content, $matches);
+        $users = User::whereIn('username', $matches[1])->where('id', '!=', $user->id)->get();
+        Notification::send($users, new NewPostTag($post));
+
+        return redirect()->to($realUrl)
+            ->with('success', trans('forum.reply-topic-success'));
     }
 
     /**
-     * Edit Post Form.
-     *
-     * @param \App\Models\Topic $id
-     * @param \App\Models\Post  $postId
+     * Edit A Post.
      */
-    public function postEditForm($id, $postId): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    public function edit(Request $request, int $id): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $topic = Topic::findOrFail($id);
-        $forum = $topic->forum;
-        $category = $forum->getCategory();
-        $post = Post::findOrFail($postId);
+        $user = $request->user();
 
-        return \view('forum.post_edit', [
+        $post = Post::find($id);
+        $topic = Topic::whereKey($post->topic_id)->authorized(canReadTopic: true, canReplyTopic: true)->sole();
+
+        abort_unless($user->group->is_modo || $user->id === $post->user_id, 403);
+
+        $forum = $topic->forum;
+        $category = $forum->category;
+
+        return view('forum.post.edit', [
             'topic'    => $topic,
             'forum'    => $forum,
             'post'     => $post,
@@ -184,44 +201,83 @@ class PostController extends Controller
     }
 
     /**
-     * Edit A Post In A Topic.
-     *
-     * @param \App\Models\Post $postId
-     *
-     * @return \Illuminate\Http\RedirectResponse
+     * Update A Post.
      */
-    public function postEdit(Request $request, $postId)
+    public function update(Request $request, int $id): \Illuminate\Http\RedirectResponse
     {
+        $request->validate([
+            'content' => 'required|min:1',
+        ]);
+
         $user = $request->user();
-        $post = Post::findOrFail($postId);
-        $postUrl = \sprintf('forums/topics/%s?page=%s#post-%s', $post->topic->id, $post->getPageNumber(), $postId);
 
-        \abort_unless($user->group->is_modo || $user->id === $post->user_id, 403);
-        $post->content = $request->input('content');
-        $post->save();
+        $post = Post::findOrFail($id);
+        $postUrl = \sprintf('forums/topics/%s/posts/%s', $post->topic->id, $id);
 
-        return \redirect()->to($postUrl)
-            ->withSuccess('Post Successfully Edited!');
+        abort_unless($user->group->is_modo || $user->id === $post->user_id, 403);
+
+        abort_unless($post->topic()->authorized(canReplyTopic: true)->exists(), 403);
+
+        $post->update([
+            'content' => $request->input('content'),
+        ]);
+
+        return redirect()->to($postUrl)
+            ->with('success', trans('forum.edit-post-success'));
     }
 
     /**
      * Delete A Post.
      *
-     * @param \App\Models\Post $postId
-     *
-     * @throws \Exception
-     *
-     * @return \Illuminate\Http\RedirectResponse
+     * @throws Exception
      */
-    public function postDelete(Request $request, $postId)
+    public function destroy(Request $request, int $id): \Illuminate\Http\RedirectResponse
     {
         $user = $request->user();
-        $post = Post::with('topic')->findOrFail($postId);
+        $post = Post::with('topic')->findOrFail($id);
 
-        \abort_unless($user->group->is_modo || $user->id === $post->user_id, 403);
+        abort_unless($user->group->is_modo || $user->id === $post->user_id, 403);
+
+        $topic = Topic::whereKey($post->topic_id)->authorized(canReplyTopic: true)->sole();
+
         $post->delete();
 
-        return \redirect()->route('forum_topic', ['id' => $post->topic->id])
-            ->withSuccess('This Post Is Now Deleted!');
+        $latestPost = $topic->latestPostSlow;
+        $isTopicDeleted = false;
+
+        if ($latestPost === null) {
+            $topic->delete();
+            $isTopicDeleted = true;
+        } else {
+            $latestPoster = $latestPost->user;
+            $topic->update([
+                'last_post_id'         => $latestPost->id,
+                'last_post_user_id'    => $latestPoster->id,
+                'num_post'             => $topic->posts()->count(),
+                'last_post_created_at' => $latestPost->created_at,
+            ]);
+        }
+
+        $forum = $topic->forum;
+        $lastRepliedTopic = $forum->lastRepliedTopicSlow;
+        $latestPost = $lastRepliedTopic->latestPostSlow;
+        $latestPoster = $latestPost->user;
+
+        $forum->update([
+            'num_post'             => $forum->posts()->count(),
+            'num_topic'            => $forum->topics()->count(),
+            'last_post_id'         => $latestPost->id,
+            'last_post_user_id'    => $latestPoster->id,
+            'last_topic_id'        => $lastRepliedTopic->id,
+            'last_post_created_at' => $latestPost->created_at,
+        ]);
+
+        if ($isTopicDeleted === true) {
+            return to_route('forums.show', ['id' => $forum->id])
+                ->with('success', trans('forum.delete-post-success'));
+        }
+
+        return to_route('topics.show', ['id' => $post->topic->id])
+            ->with('success', trans('forum.delete-post-success'));
     }
 }

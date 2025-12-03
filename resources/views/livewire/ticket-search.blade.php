@@ -1,192 +1,194 @@
-<div>
-	<div class="mb-10 form-inline pull-left">
-		<a href="{{ route('tickets.create') }}" class="btn btn-success"><i class="fas fa-plus"></i> @lang('ticket.create-ticket')</a>
-	</div>
-	<div class="mb-10 form-inline pull-left">
-		<div class="form-group" style="padding-top: 8px; padding-left: 15px;">
-			<input type="checkbox" wire:click="toggleProperties('show')">
-			Show Closed Tickets
-		</div>
-	</div>
-	<div class="mb-10 form-inline pull-right">
-		<div class="form-group">
-			@lang('common.quantity')
-			<select wire:model="perPage" class="form-control">
-				<option>25</option>
-				<option>50</option>
-				<option>100</option>
-			</select>
-		</div>
+<section class="panelV2" x-data="{ tab: @entangle('tab').live }">
+    <header class="panel__header">
+        <h2 class="panel__heading">{{ __('ticket.helpdesk') }}</h2>
+        <div class="panel__actions">
+            <div class="panel__action">
+                <div class="form__group">
+                    <select id="quantity" class="form__select" wire:model.live="perPage" required>
+                        <option>25</option>
+                        <option>50</option>
+                        <option>100</option>
+                    </select>
+                    <label class="form__label form__label--floating" for="quantity">
+                        {{ __('common.quantity') }}
+                    </label>
+                </div>
+            </div>
+            <div class="panel__action">
+                <div class="form__group">
+                    <input
+                        id="search"
+                        class="form__text"
+                        type="search"
+                        autocomplete="off"
+                        wire:model.live="search"
+                        placeholder=" "
+                    />
+                    <label class="form__label form__label--floating" for="search">
+                        {{ __('ticket.subject') }}
+                    </label>
+                </div>
+            </div>
+            @if (auth()->user()->group->is_modo)
+                <div class="panel__action">
+                    <div class="form__group">
+                        <input
+                            id="show"
+                            class="form__checkbox"
+                            type="checkbox"
+                            wire:model.live="show"
+                        />
+                        <label class="form__label" for="show">My assigned tickets</label>
+                    </div>
+                </div>
+            @endif
 
-		<div class="form-group">
-			<input type="text" wire:model="search" class="form-control" style="width: 275px;" placeholder="@lang('ticket.subject')"/>
-		</div>
-	</div>
-	<div class="box-body no-padding">
-		<table class="table vertical-align table-hover">
-			<tbody>
-			<tr>
-				<th>
-					<div sortable wire:click="sortBy('id')" :direction="$sortField === 'id' ? $sortDirection : null" role="button">
-						#
-						@include('livewire.includes._sort-icon', ['field' => 'id'])
-					</div>
-				</th>
-				<th>
-					<div sortable wire:click="sortBy('subject')" :direction="$sortField === 'subject' ? $sortDirection : null" role="button">
-						@lang('ticket.subject')
-						@include('livewire.includes._sort-icon', ['field' => 'subject'])
-					</div>
-				</th>
-				<th>
-					<div sortable wire:click="sortBy('priority_id')" :direction="$sortField === 'priority_id' ? $sortDirection : null" role="button">
-						@lang('ticket.priority')
-						@include('livewire.includes._sort-icon', ['field' => 'priority_id'])
-					</div>
-				</th>
-				<th>
-					<div sortable wire:click="sortBy('user_id')" :direction="$sortField === 'user_id' ? $sortDirection : null" role="button">
-						@lang('common.username')
-						@include('livewire.includes._sort-icon', ['field' => 'user_id'])
-					</div>
-				</th>
-				<th class="hidden-sm hidden-xs">
-					<div sortable wire:click="sortBy('closed_at')" :direction="$sortField === 'closed_at' ? $sortDirection : null"
-					     role="button">
-						@lang('common.status')
-						@include('livewire.includes._sort-icon', ['field' => 'closed_at'])
-					</div>
-				</th>
-				<th class="hidden-sm hidden-xs">
-					<div sortable wire:click="sortBy('staff_id')" :direction="$sortField === 'staff_id' ? $sortDirection : null"
-					     role="button">
-						@lang('ticket.assigned-staff')
-						@include('livewire.includes._sort-icon', ['field' => 'staff_id'])
-					</div>
-				</th>
-				<th class="hidden-sm hidden-xs">
-					<div sortable wire:click="sortBy('created_at')" :direction="$sortField === 'created_at' ? $sortDirection : null"
-					     role="button">
-						@lang('ticket.created')
-						@include('livewire.includes._sort-icon', ['field' => 'created_at'])
-					</div>
-				</th>
-				<th>@lang('common.action')</th>
-			</tr>
-			@foreach ($tickets as $ticket)
-				<tr>
-					<td>
-						<span class="badge-user">
-							{{ $ticket->id }}
-						</span>
-					</td>
-					<td>
-						<span>
-							<a href="{{ route('tickets.show', ['id' => $ticket->id]) }}">{{ $ticket->subject }}</a>
-						</span>
-						@if (auth()->user()->group->is_modo)
-							@php
-								$myTicketUnread = DB::table('tickets')
-									->where('id', '=', $ticket->id)
-									->where('staff_id', '=', auth()->user()->id)
-									->where('staff_read', '=', 0)
-									->count();
-
-								$unasignedTicketUnread = DB::table('tickets')
-									->where('id', '=', $ticket->id)
-									->whereNull('staff_id')
-									->whereNull('closed_at')
-									->count();
-							@endphp
-						@else
-							@php
-								$myTicketUnread = DB::table('tickets')
-									->where('id', '=', $ticket->id)
-									->where('user_id', '=', auth()->user()->id)
-									->where('user_read', '=', 0)
-									->count();
-
-								$unasignedTicketUnread = 0;
-							@endphp
-						@endif
-
-						@if ($myTicketUnread > 0 || $unasignedTicketUnread > 0)
-							<i style="color: #0dffff;vertical-align: 1px;" class="fas fa-circle fa-xs"></i>
-						@endif
-					</td>
-					<td>
-						<span class="badge-user">
-							@if($ticket->priority->name === 'Low')
-								<i class="fas fa-circle text-yellow"></i>
-							@elseif ($ticket->priority->name === 'Medium')
-								<i class="fas fa-circle text-orange"></i>
-							@elseif ($ticket->priority->name === 'High')
-								<i class="fas fa-circle text-red"></i>
-							@endif
-							{{ $ticket->priority->name }}
-						</span>
-					</td>
-					<td>
-						<span class="badge-user">
-							<a href="{{ route('users.show', ['username' => $ticket->user->username]) }}">
-								{{ $ticket->user->username }}
-							</a>
-						</span>
-					</td>
-					<td>
-						<span class="badge-user">
-							@if($ticket->closed_at)
-								<i class="fas fa-circle text-danger"></i> Closed
-							@else
-								<i class="fas fa-circle text-success"></i> Open
-							@endif
-						</span>
-					</td>
-					<td>
-						<span class="badge-user">
-							<a href="{{ route('users.show', ['username' => $ticket->staff->username ?? 'System']) }}">
-								{{ $ticket->staff->username ?? 'Unassigned' }}
-							</a>
-						</span>
-					</td>
-					<td>
-						<span class="badge-user">
-							{{ $ticket->created_at->diffForHumans() }}
-						</span>
-					</td>
-					<td>
-						<div class="dropdown">
-							<a class="dropdown-toggle btn btn-default btn-xs" data-toggle="dropdown" href="#" aria-expanded="true">
-								@lang('common.actions')
-								<i class="fas fa-caret-circle-right"></i>
-							</a>
-							<ul class="dropdown-menu">
-								<li role="presentation">
-									<a role="menuitem" tabindex="-1" target="_blank"
-									   href="{{ route('tickets.show', ['id' => $ticket->id]) }}">View</a>
-								</li>
-								<li role="presentation">
-									<form method="POST" action="{{ route('tickets.close', ['id' => $ticket->id]) }}">
-										@csrf
-										<button type="submit" role="menuitem" tabindex="-1" style="background-color: #fff; color: #555;
-										font-weight: 400; padding: 7px 15px;">Close</button>
-									</form>
-								</li>
-							</ul>
-						</div>
-					</td>
-				</tr>
-			@endforeach
-			</tbody>
-		</table>
-		@if (! $tickets->count())
-			<div class="margin-10">
-				@lang('common.no-result')
-			</div>
-		@endif
-		<br>
-		<div class="text-center">
-			{{ $tickets->links() }}
-		</div>
-	</div>
-</div>
+            <div class="panel__action">
+                <a href="{{ route('tickets.create') }}" class="form__button form__button--text">
+                    {{ __('ticket.create-ticket') }}
+                </a>
+            </div>
+        </div>
+    </header>
+    <menu class="panel__tabs panel__tabs--centered">
+        <li
+            class="panel__tab panel__tab--full-width"
+            role="tab"
+            x-bind:class="tab === 'open' && 'panel__tab--active'"
+            x-on:click="tab = 'open'"
+        >
+            Open
+        </li>
+        <li
+            class="panel__tab panel__tab--full-width"
+            role="tab"
+            x-bind:class="tab === 'closed' && 'panel__tab--active'"
+            x-on:click="tab = 'closed'"
+        >
+            Closed
+        </li>
+    </menu>
+    <div class="data-table-wrapper">
+        <table class="data-table">
+            <tbody>
+                <tr>
+                    <th wire:click="sortBy('id')" role="columnheader button">
+                        #
+                        @include('livewire.includes._sort-icon', ['field' => 'id'])
+                    </th>
+                    <th wire:click="sortBy('subject')" role="columnheader button">
+                        {{ __('ticket.subject') }}
+                        @include('livewire.includes._sort-icon', ['field' => 'subject'])
+                    </th>
+                    <th wire:click="sortBy('priority_id')" role="columnheader button">
+                        {{ __('ticket.priority') }}
+                        @include('livewire.includes._sort-icon', ['field' => 'priority_id'])
+                    </th>
+                    <th wire:click="sortBy('user_id')" role="columnheader button">
+                        {{ __('common.username') }}
+                        @include('livewire.includes._sort-icon', ['field' => 'user_id'])
+                    </th>
+                    <th wire:click="sortBy('staff_id')" role="columnheader button">
+                        {{ __('ticket.assigned-staff') }}
+                        @include('livewire.includes._sort-icon', ['field' => 'staff_id'])
+                    </th>
+                    <th wire:click="sortBy('created_at')" role="columnheader button">
+                        {{ __('ticket.created') }}
+                        @include('livewire.includes._sort-icon', ['field' => 'created_at'])
+                    </th>
+                    <th wire:click="sortBy('updated_at')" role="columnheader button">
+                        {{ __('torrent.updated') }}
+                        @include('livewire.includes._sort-icon', ['field' => 'updated_at'])
+                    </th>
+                    <th wire:click="sortBy('closed_at')" role="columnheader button">
+                        {{ __('ticket.closed') }}
+                        @include('livewire.includes._sort-icon', ['field' => 'closed_at'])
+                    </th>
+                    <th>{{ __('common.action') }}</th>
+                </tr>
+                @forelse ($tickets as $ticket)
+                    <tr>
+                        <td>
+                            {{ $ticket->id }}
+                        </td>
+                        <td>
+                            <a href="{{ route('tickets.show', ['ticket' => $ticket]) }}">
+                                {{ $ticket->subject }}
+                            </a>
+                            @if ((auth()->user()->group->is_modo &&
+                                (($ticket->staff_id === auth()->id() && $ticket->staff_read === false) ||
+                                    ($ticket->staff_id === null && $ticket->closed_at === null))) ||
+                                ($ticket->user_id === auth()->id() && $ticket->user_read === false))
+                                <i
+                                    style="color: #0dffff; vertical-align: 1px"
+                                    class="{{ config('other.font-awesome') }} fa-circle fa-xs"
+                                ></i>
+                            @endif
+                        </td>
+                        <td>
+                            <i
+                                class="{{ config('other.font-awesome') }} {{ $ticket->priority->icon }}"
+                                style="color: {{ $ticket->priority->color }}"
+                            ></i>
+                            {{ $ticket->priority->name }}
+                        </td>
+                        <td>
+                            <x-user-tag :user="$ticket->user" :anon="false" />
+                        </td>
+                        <td>
+                            @if ($ticket->staff)
+                                <x-user-tag :user="$ticket->staff" :anon="false" />
+                            @else
+                                Unassigned
+                            @endif
+                        </td>
+                        <td>
+                            <time
+                                datetime="{{ $ticket->created_at }}"
+                                title="{{ $ticket->created_at }}"
+                            >
+                                {{ $ticket->created_at->diffForHumans() }}
+                            </time>
+                        </td>
+                        <td>
+                            <time
+                                datetime="{{ $ticket->updated_at }}"
+                                title="{{ $ticket->updated_at }}"
+                            >
+                                {{ $ticket->updated_at->diffForHumans() }}
+                            </time>
+                        </td>
+                        <td>
+                            <time
+                                datetime="{{ $ticket->closed_at }}"
+                                title="{{ $ticket->closed_at }}"
+                            >
+                                {{ $ticket->closed_at?->diffForHumans() ?? 'N/A' }}
+                            </time>
+                        </td>
+                        <td>
+                            <menu class="data-table__actions">
+                                <li class="data-table__action">
+                                    <form
+                                        method="POST"
+                                        action="{{ route('tickets.close', ['ticket' => $ticket]) }}"
+                                    >
+                                        @csrf
+                                        <button class="form__button form__button--text">
+                                            {{ __('ticket.close') }}
+                                        </button>
+                                    </form>
+                                </li>
+                            </menu>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="9">{{ __('common.no-result') }}</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+        {{ $tickets->links('partials.pagination') }}
+    </div>
+</section>

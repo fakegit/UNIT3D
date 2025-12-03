@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,12 +16,15 @@
 
 namespace App\Http\Controllers\Staff;
 
+use App\Enums\ModerationStatus;
 use App\Helpers\SystemInformation;
 use App\Http\Controllers\Controller;
 use App\Models\Group;
+use App\Services\Unit3dAnnounce;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Spatie\SslCertificate\SslCertificate;
+use Exception;
 
 /**
  * @see \Tests\Todo\Feature\Http\Controllers\Staff\HomeControllerTest
@@ -28,76 +34,55 @@ class HomeController extends Controller
     /**
      * Display Staff Dashboard.
      *
-     *
-     * @throws \Exception
+     * @throws Exception
      */
     public function index(Request $request): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        // User Info
-        $bannedGroup = \cache()->rememberForever('banned_group', fn () => Group::where('slug', '=', 'banned')->pluck('id'));
-        $validatingGroup = \cache()->rememberForever('validating_group', fn () => Group::where('slug', '=', 'validating')->pluck('id'));
-        $users = DB::table('users')
-            ->selectRaw('count(*) as total')
-            ->selectRaw(\sprintf('count(case when group_id = %s then 1 end) as banned', $bannedGroup[0]))
-            ->selectRaw(\sprintf('count(case when group_id = %s then 1 end) as validating', $validatingGroup[0]))
-            ->first();
-
-        // Torrent Info
-        $torrents = DB::table('torrents')
-            ->selectRaw('count(*) as total')
-            ->selectRaw('count(case when status = 0 then 1 end) as pending')
-            ->selectRaw('count(case when status = 2 then 1 end) as rejected')
-            ->selectRaw('count(case when status = 3 then 1 end) as postponed')
-            ->first();
-
-        // Peers Info
-        $peers = DB::table('peers')
-            ->selectRaw('count(*) as total')
-            ->selectRaw('count(case when seeder = 0 then 1 end) as leechers')
-            ->selectRaw('count(case when seeder = 1 then 1 end) as seeders')
-            ->first();
-
-        // Reports Info
-        $reports = DB::table('reports')
-            ->selectRaw('count(case when solved = 0 then 1 end) as unsolved')
-            ->first();
-
-        // Pending Applications Count
-        $apps = DB::table('applications')
-            ->selectRaw('count(case when status = 0 then 1 end) as pending')
-            ->first();
-
         // SSL Info
         try {
-            $certificate = $request->secure() ? SslCertificate::createForHostName(\config('app.url')) : '';
-        } catch (\Exception) {
+            $certificate = $request->secure() ? SslCertificate::createForHostName(config('app.url')) : '';
+        } catch (Exception) {
             $certificate = '';
         }
 
         // System Information
         $systemInformation = new SystemInformation();
-        $uptime = $systemInformation->uptime();
-        $ram = $systemInformation->memory();
-        $disk = $systemInformation->disk();
-        $avg = $systemInformation->avg();
-        $basic = $systemInformation->basic();
 
-        // Directory Permissions
-        $filePermissions = $systemInformation->directoryPermissions();
-
-        return \view('Staff.dashboard.index', [
-            'users'              => $users,
-            'torrents'           => $torrents,
-            'peers'              => $peers,
-            'reports'            => $reports,
-            'apps'               => $apps,
-            'certificate'        => $certificate,
-            'uptime'             => $uptime,
-            'ram'                => $ram,
-            'disk'               => $disk,
-            'avg'                => $avg,
-            'basic'              => $basic,
-            'file_permissions'   => $filePermissions,
+        return view('Staff.dashboard.index', [
+            'users' => cache()->flexible('dashboard_users', [60 * 5, 60 * 10], fn () => DB::table('users')
+                ->selectRaw('COUNT(*) AS total')
+                ->selectRaw('SUM(group_id = ?) AS banned', [Group::where('slug', '=', 'banned')->soleValue('id')])
+                ->selectRaw('SUM(group_id = ?) AS validating', [Group::where('slug', '=', 'validating')->soleValue('id')])
+                ->first()),
+            'torrents' => cache()->flexible('dashboard_torrents', [60 * 5, 60 * 10], fn () => DB::table('torrents')
+                ->whereNull('deleted_at')
+                ->selectRaw('COUNT(*) AS total')
+                ->selectRaw('SUM(status = 0) AS pending')
+                ->selectRaw('SUM(status = 1) AS approved')
+                ->selectRaw('SUM(status = 2) AS rejected')
+                ->selectRaw('SUM(status = 3) AS postponed')
+                ->first()),
+            'peers' => cache()->flexible('dashboard_peers', [60 * 5, 60 * 10], fn () => DB::table('peers')
+                ->selectRaw('COUNT(*) AS total')
+                ->selectRaw('SUM(active = TRUE) AS active')
+                ->selectRaw('SUM(active = FALSE) AS inactive')
+                ->selectRaw('SUM(seeder = FALSE AND active = TRUE) AS leechers')
+                ->selectRaw('SUM(seeder = TRUE AND active = TRUE) AS seeders')
+                ->first()),
+            'unsolvedReportsCount' => DB::table('reports')
+                ->whereNull('snoozed_until')
+                ->whereNull('solved_by')
+                ->where(fn ($query) => $query->whereNull('assigned_to')->orWhere('assigned_to', '=', auth()->id()))
+                ->count(),
+            'pendingApplicationsCount' => DB::table('applications')->where('status', '=', ModerationStatus::PENDING)->count(),
+            'certificate'              => $certificate,
+            'uptime'                   => $systemInformation->uptime(),
+            'ram'                      => $systemInformation->memory(),
+            'disk'                     => $systemInformation->disk(),
+            'avg'                      => $systemInformation->avg(),
+            'basic'                    => $systemInformation->basic(),
+            'file_permissions'         => $systemInformation->directoryPermissions(),
+            'externalTrackerStats'     => Unit3dAnnounce::getStats(),
         ]);
     }
 }

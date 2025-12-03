@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -24,20 +27,16 @@ class DenyApplication extends Mailable
 
     /**
      * DenyApplication Constructor.
-     *
-     * @param $deniedMessage
      */
-    public function __construct(public $deniedMessage)
+    public function __construct(public string $deniedMessage)
     {
     }
 
     /**
      * Build the message.
-     *
-     * @return $this
      */
-    public function build()
+    public function build(): static
     {
-        return $this->markdown('emails.deny_application')->subject('Your Application Has Been Denied!');
+        return $this->markdown('emails.deny-application')->subject('Your Application Has Been Denied!');
     }
 }

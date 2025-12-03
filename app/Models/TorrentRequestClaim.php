@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,37 +19,69 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\TorrentRequestClaim.
  *
  * @property int                             $id
  * @property int                             $request_id
- * @property string|null                     $username
+ * @property int                             $user_id
  * @property int                             $anon
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestClaim newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestClaim newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestClaim query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestClaim whereAnon($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestClaim whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestClaim whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestClaim whereRequestId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestClaim whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestClaim whereUsername($value)
- * @mixin \Eloquent
  */
-class TorrentRequestClaim extends Model
+#[AllowDynamicProperties]
+final class TorrentRequestClaim extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\TorrentRequestClaimFactory> */
+    use HasFactory;
+
     /**
-     * The Database Table Used By The Model.
+     * The table associated with the model.
      *
      * @var string
      */
     protected $table = 'request_claims';
+
+    /**
+     * The attributes that aren't mass assignable.
+     *
+     * @var string[]
+     */
+    protected $guarded = ['id', 'created_at', 'updated_at'];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array{anon: 'bool'}
+     */
+    protected function casts(): array
+    {
+        return [
+            'anon' => 'bool',
+        ];
+    }
+
+    /**
+     * Get the user that claimed the request.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the request that the user claimed.
+     * @return BelongsTo<TorrentRequest, $this>
+     */
+    public function request(): BelongsTo
+    {
+        return $this->belongsTo(TorrentRequest::class);
+    }
 }

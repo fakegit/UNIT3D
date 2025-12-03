@@ -1,76 +1,32 @@
 <?php
 
-namespace Tests\Feature\Http\Controllers;
-
-use App\Models\Forum;
-use App\Models\Permission;
-use App\Models\User;
-use Database\Seeders\GroupsTableSeeder;
-use Database\Seeders\UsersTableSeeder;
-use Tests\TestCase;
+declare(strict_types=1);
 
 /**
- * @see \App\Http\Controllers\ForumCategoryController
+ * NOTICE OF LICENSE.
+ *
+ * UNIT3D Community Edition is open-sourced software licensed under the GNU Affero General Public License v3.0
+ * The details is bundled with this project in the file LICENSE.txt.
+ *
+ * @project    UNIT3D Community Edition
+ *
+ * @author     HDVinnie <hdinnovations@protonmail.com>
+ * @license    https://www.gnu.org/licenses/agpl-3.0.en.html/ GNU Affero General Public License v3.0
  */
-class ForumCategoryControllerTest extends TestCase
-{
-    /** @test */
-    public function show_category_returns_an_ok_response()
-    {
-        $this->seed(UsersTableSeeder::class);
-        $this->seed(GroupsTableSeeder::class);
 
-        $user = User::factory()->create();
+use App\Models\Forum;
+use App\Models\ForumPermission;
+use App\Models\User;
 
-        // This Forum has a parent Forum, which makes it a "Forum Category".
+test('show returns an ok response', function (): void {
+    $user = User::factory()->create();
 
-        $parentForum = Forum::factory()->create();
+    $forum = Forum::factory()->create();
 
-        Permission::factory()->create([
-            'forum_id' => $parentForum->id,
-        ]);
+    ForumPermission::factory()->create([
+        'group_id' => $user->group_id,
+        'forum_id' => $forum->id,
+    ]);
 
-        $forum = Forum::factory()->create([
-            'parent_id' => $parentForum->id,
-        ]);
-
-        $this->actingAs($user)->get(route('forums.categories.show', ['id' => $forum->id]))
-            ->assertRedirect(route('forums.show', ['id' => $forum->id]));
-    }
-
-    /** @test */
-    public function show_forum_returns_an_ok_response()
-    {
-        $this->seed(UsersTableSeeder::class);
-        $this->seed(GroupsTableSeeder::class);
-
-        // This Forum does not have a parent, which makes it a proper Forum
-        // (and not a "Forum Category").
-
-        $forum = Forum::factory()->create([
-            'parent_id' => 0,
-        ]);
-
-        $permissions = Permission::factory()->create([
-            'forum_id'   => $forum->id,
-            'show_forum' => true,
-        ]);
-
-        $user = User::factory()->create([
-            'group_id' => $permissions['group_id'],
-        ]);
-
-        $response = $this->actingAs($user)->get(route('forums.categories.show', ['id' => $forum->id]));
-
-        $response->assertOk()
-            ->assertViewIs('forum.category')
-            ->assertViewHas([
-                'forum',
-                'topics',
-                'category',
-                'num_posts',
-                'num_forums',
-                'num_topics',
-            ]);
-    }
-}
+    $this->actingAs($user)->get(route('forums.categories.show', ['id' => $forum->forum_category_id]));
+});

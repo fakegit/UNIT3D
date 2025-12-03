@@ -1,318 +1,446 @@
-<div>
-	<div class="container-fluid">
-		<style>
-            .form-group {
-                margin-bottom: 5px !important;
-            }
-            .badge-extra {
-                margin-bottom: 0;
-            }
-		</style>
-		<div x-data="{ open: false }" class="container box" style="margin-bottom: 0; padding: 10px 100px; border-radius: 5px;">
-			<div class="mt-5">
-				<div class="row">
-					<div class="form-group col-xs-9">
-						<input wire:model="name" type="search" class="form-control" placeholder="@lang('common.name')" />
-					</div>
-					<div class="form-group col-xs-3">
-						<button class="btn btn-md btn-primary" @click="open = ! open" x-text="open ? '@lang('common.search-hide')' : '@lang('common.search-advanced')'"></button>
-					</div>
-				</div>
-				<div x-show="open">
-					<div class="row">
-						<div class="form-group col-xs-9">
-							<input wire:model="requestor" type="search" class="form-control" placeholder="@lang('common.author')" />
-						</div>
-					</div>
-					<div class="row">
-						<div class="form-group form-inline col-sm-3 col-xs-6">
-							<label for="meta" class="label label-default">Meta IDs</label>
-							<input wire:model="tmdbId" type="text" class="form-control" placeholder="TMDb ID" style="width: 65%;">
-						</div>
-						<div class="form-group col-sm-2 col-xs-6">
-							<input wire:model="imdbId" type="text" class="form-control" placeholder="IMDb ID">
-						</div>
-						<div class="form-group col-sm-2 col-xs-6">
-							<input wire:model="tvdbId" type="text" class="form-control" placeholder="TVDb ID">
-						</div>
-						<div class="form-group col-sm-2 col-xs-6">
-							<input wire:model="malId" type="text" class="form-control" placeholder="MAL ID">
-						</div>
-					</div>
-					<div class="row">
-						<div class="form-group col-sm-12 col-xs-6">
-							<label for="categories" class="label label-default">@lang('common.category')</label>
-							@foreach (App\Models\Category::select(['id', 'name', 'position'])->get()->sortBy('position') as $category)
-								<span class="badge-user">
-									<label class="inline">
-										<input type="checkbox" wire:model="categories" value="{{ $category->id }}"> {{ $category->name }}
-									</label>
-								</span>
-							@endforeach
-						</div>
-					</div>
-					<div class="row">
-						<div class="form-group col-sm-12 col-xs-6">
-							<label for="types" class="label label-default">@lang('common.type')</label>
-							@foreach (App\Models\Type::select(['id', 'name', 'position'])->get()->sortBy('position') as $type)
-								<span class="badge-user">
-									<label class="inline">
-										<input type="checkbox" wire:model="types" value="{{ $type->id }}"> {{ $type->name }}
-									</label>
-								</span>
-							@endforeach
-						</div>
-					</div>
-					<div class="row">
-						<div class="form-group col-sm-12 col-xs-6">
-							<label for="resolutions" class="label label-default">@lang('common.resolution')</label>
-							@foreach (App\Models\Resolution::select(['id', 'name', 'position'])->get()->sortBy('position') as $resolution)
-								<span class="badge-user">
-									<label class="inline">
-										<input type="checkbox" wire:model="resolutions" value="{{ $resolution->id }}"> {{ $resolution->name }}
-									</label>
-								</span>
-							@endforeach
-						</div>
-					</div>
-					<div class="row">
-						<div class="form-group col-sm-12 col-xs-6">
-							<label for="extra" class="label label-default">@lang('common.status')</label>
-							<span class="badge-user">
-								<label class="inline">
-									<input wire:model="unfilled" type="checkbox" value="1">
-									<span class="{{ config('other.font-awesome') }} fa-times-circle text-blue"></span>
-									@lang('request.unfilled')
-								</label>
-							</span>
-							<span class="badge-user">
-								<label class="inline">
-									<input wire:model="claimed" type="checkbox" value="1">
-									<span class="{{ config('other.font-awesome') }} fa-hand-paper text-blue"></span>
-									@lang('request.claimed')
-								</label>
-							</span>
-							<span class="badge-user">
-								<label class="inline">
-									<input wire:model="pending" type="checkbox" value="1">
-									<span class="{{ config('other.font-awesome') }} fa-question-circle text-blue"></span>
-									@lang('request.pending')
-								</label>
-							</span>
-							<span class="badge-user">
-								<label class="inline">
-									<input wire:model="filled" type="checkbox" value="1">
-									<span class="{{ config('other.font-awesome') }} fa-check-circle text-blue"></span>
-									@lang('request.filled')
-								</label>
-							</span>
-						</div>
-					</div>
+<div class="page__requests request-search__component">
+    <search class="compact-search request-search__filters" x-data="toggle">
+        <div class="compact-search__visible-default">
+            <p class="form__group">
+                <input
+                    id="name"
+                    wire:model.live="name"
+                    type="search"
+                    autocomplete="off"
+                    class="form__text"
+                    placeholder=" "
+                />
+                <label class="form__label form__label--floating" for="name">
+                    {{ __('common.search') }}
+                </label>
+            </p>
+            <button class="form__button form__standard-icon-button" x-on:click="toggle">
+                <i class="{{ config('other.font-awesome') }} fa-sliders"></i>
+            </button>
+        </div>
+        <form class="form" x-cloak x-show="isToggledOn">
+            <div class="form__group--horizontal">
+                <p class="form__group">
+                    <input
+                        id="requester"
+                        wire:model.live="requestor"
+                        class="form__text"
+                        type="search"
+                        autocomplete="off"
+                        placeholder=" "
+                    />
+                    <label class="form__label form__label--floating" for="requester">
+                        {{ __('common.author') }}
+                    </label>
+                </p>
+            </div>
+            <div class="form__group--short-horizontal">
+                <p class="form__group">
+                    <input
+                        id="tmdbId"
+                        wire:model.live="tmdbId"
+                        class="form__text"
+                        type="search"
+                        autocomplete="off"
+                        placeholder=" "
+                    />
+                    <label class="form__label form__label--floating" for="tmdbId">TMDb ID</label>
+                </p>
+                <p class="form__group">
+                    <input
+                        id="imdbId"
+                        wire:model.live="imdbId"
+                        class="form__text"
+                        type="search"
+                        autocomplete="off"
+                        pattern="[0-9]+|tt0*\d{7,}"
+                        placeholder=" "
+                    />
+                    <label class="form__label form__label--floating" for="imdbId">IMDb ID</label>
+                </p>
+                <p class="form__group">
+                    <input
+                        id="tvdbId"
+                        wire:model.live="tvdbId"
+                        class="form__text"
+                        type="search"
+                        autocomplete="off"
+                        placeholder=" "
+                    />
+                    <label class="form__label form__label--floating" for="tvdbId">TVDb ID</label>
+                </p>
+                <p class="form__group">
+                    <input
+                        id="malId"
+                        wire:model.live="malId"
+                        class="form__text"
+                        type="search"
+                        autocomplete="off"
+                        placeholder=" "
+                    />
+                    <label class="form__label form__label--floating" for="malId">MAL ID</label>
+                </p>
+            </div>
+            <div class="form__group--short-horizontal">
+                <div class="form__group">
+                    <fieldset class="form__fieldset">
+                        <legend class="form__legend">{{ __('torrent.category') }}</legend>
+                        <div class="form__fieldset-checkbox-container">
+                            @foreach ($categories as $category)
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="{{ $category->id }}"
+                                            wire:model.live="categoryIds"
+                                        />
+                                        {{ $category->name }}
+                                    </label>
+                                </p>
+                            @endforeach
+                        </div>
+                    </fieldset>
+                </div>
+                <div class="form__group">
+                    <fieldset class="form__fieldset">
+                        <legend class="form__legend">{{ __('common.type') }}</legend>
+                        <div class="form__fieldset-checkbox-container">
+                            @foreach ($types as $type)
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="{{ $type->id }}"
+                                            wire:model.live="typeIds"
+                                        />
+                                        {{ $type->name }}
+                                    </label>
+                                </p>
+                            @endforeach
+                        </div>
+                    </fieldset>
+                </div>
+                <div class="form__group">
+                    <fieldset class="form__fieldset">
+                        <legend class="form__legend">{{ __('common.resolution') }}</legend>
+                        <div class="form__fieldset-checkbox-container">
+                            @foreach ($resolutions as $resolution)
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="{{ $resolution->id }}"
+                                            wire:model.live="resolutionIds"
+                                        />
+                                        {{ $resolution->name }}
+                                    </label>
+                                </p>
+                            @endforeach
+                        </div>
+                    </fieldset>
+                </div>
+                <div class="form__group">
+                    <fieldset class="form__fieldset">
+                        <legend class="form__legend">{{ __('torrent.genre') }}</legend>
+                        <div class="form__fieldset-checkbox-container">
+                            @foreach ($genres as $genre)
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="{{ $genre->id }}"
+                                            wire:model.live="genreIds"
+                                        />
+                                        {{ $genre->name }}
+                                    </label>
+                                </p>
+                            @endforeach
+                        </div>
+                    </fieldset>
+                </div>
+                <div class="form__group">
+                    <fieldset class="form__fieldset">
+                        <legend class="form__legend">Primary language</legend>
+                        <div class="form__fieldset-checkbox-container">
+                            @foreach ($primaryLanguages as $primaryLanguage)
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="{{ $primaryLanguage }}"
+                                            wire:model.live="primaryLanguageNames"
+                                        />
+                                        {{ $primaryLanguage }}
+                                    </label>
+                                </p>
+                            @endforeach
+                        </div>
+                    </fieldset>
+                </div>
+                <div class="form__group">
+                    <fieldset class="form__fieldset">
+                        <legend class="form__legend">{{ __('common.status') }}</legend>
+                        <div class="form__fieldset-checkbox-container">
+                            <p class="form__group">
+                                <label class="form__label">
+                                    <input
+                                        class="form__checkbox"
+                                        type="checkbox"
+                                        value="1"
+                                        wire:model.live="unfilled"
+                                    />
+                                    {{ __('request.unfilled') }}
+                                </label>
+                            </p>
+                            <p class="form__group">
+                                <label class="form__label">
+                                    <input
+                                        class="form__checkbox"
+                                        type="checkbox"
+                                        value="1"
+                                        wire:model.live="claimed"
+                                    />
+                                    {{ __('request.claimed') }}
+                                </label>
+                            </p>
+                            <p class="form__group">
+                                <label class="form__label">
+                                    <input
+                                        class="form__checkbox"
+                                        type="checkbox"
+                                        value="1"
+                                        wire:model.live="pending"
+                                    />
+                                    {{ __('request.pending') }}
+                                </label>
+                            </p>
+                            <p class="form__group">
+                                <label class="form__label">
+                                    <input
+                                        class="form__checkbox"
+                                        type="checkbox"
+                                        value="1"
+                                        wire:model.live="filled"
+                                    />
+                                    {{ __('request.filled') }}
+                                </label>
+                            </p>
+                        </div>
+                    </fieldset>
+                </div>
+                <div class="form__group">
+                    <fieldset class="form__fieldset">
+                        <legend class="form__legend">{{ __('common.extra') }}</legend>
+                        <div class="form__fieldset-checkbox-container">
+                            <p class="form__group">
+                                <label class="form__label">
+                                    <input
+                                        class="form__checkbox"
+                                        type="checkbox"
+                                        value="1"
+                                        wire:model.live="myRequests"
+                                    />
+                                    {{ __('request.my-requests') }}
+                                </label>
+                            </p>
+                            <p class="form__group">
+                                <label class="form__label">
+                                    <input
+                                        class="form__checkbox"
+                                        type="checkbox"
+                                        value="1"
+                                        wire:model.live="myClaims"
+                                    />
+                                    {{ __('request.my-claims') }}
+                                </label>
+                            </p>
+                            <p class="form__group">
+                                <label class="form__label">
+                                    <input
+                                        class="form__checkbox"
+                                        type="checkbox"
+                                        value="1"
+                                        wire:model.live="myVoted"
+                                    />
+                                    {{ __('request.my-voted') }}
+                                </label>
+                            </p>
+                            <p class="form__group">
+                                <label class="form__label">
+                                    <input
+                                        class="form__checkbox"
+                                        type="checkbox"
+                                        value="1"
+                                        wire:model.live="myFilled"
+                                    />
+                                    {{ __('request.my-filled') }}
+                                </label>
+                            </p>
+                        </div>
+                    </fieldset>
+                </div>
+            </div>
+        </form>
+    </search>
+    <section class="panelV2">
+        <header class="panel__header">
+            <h2 class="panel__heading">{{ __('request.requests') }}</h2>
+            <div class="panel__actions">
+                <div class="panel__action">
+                    <a
+                        href="{{ route('requests.create') }}"
+                        class="form__button form__button--text"
+                    >
+                        {{ __('request.add-request') }}
+                    </a>
+                </div>
+            </div>
+        </header>
+        <div class="data-table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th wire:click="sortBy('name')" role="columnheader button">
+                            {{ __('common.name') }}
+                            @include('livewire.includes._sort-icon', ['field' => 'name'])
+                        </th>
+                        <th wire:click="sortBy('category_id')" role="columnheader button">
+                            {{ __('common.category') }}
+                            @include('livewire.includes._sort-icon', ['field' => 'category_id'])
+                        </th>
+                        <th wire:click="sortBy('type_id')" role="columnheader button">
+                            {{ __('common.type') }}
+                            @include('livewire.includes._sort-icon', ['field' => 'type_id'])
+                        </th>
+                        <th wire:click="sortBy('resolution_id')" role="columnheader button">
+                            {{ __('common.resolution') }}
+                            @include('livewire.includes._sort-icon', ['field' => 'resolution_id'])
+                        </th>
+                        <th wire:click="sortBy('user_id')" role="columnheader button">
+                            {{ __('common.author') }}
+                            @include('livewire.includes._sort-icon', ['field' => 'user_id'])
+                        </th>
+                        <th wire:click="sortBy('bounties_count')" role="columnheader button">
+                            <i class="{{ config('other.font-awesome') }} fa-thumbs-up"></i>
+                            @include('livewire.includes._sort-icon', ['field' => 'bounties_count'])
+                        </th>
+                        <th>
+                            <i class="{{ config('other.font-awesome') }} fa-comment-alt-lines"></i>
+                        </th>
+                        <th wire:click="sortBy('bounty')" role="columnheader button">
+                            <i class="{{ config('other.font-awesome') }} fa-coins"></i>
+                            @include('livewire.includes._sort-icon', ['field' => 'bounty'])
+                        </th>
+                        <th wire:click="sortBy('created_at')" role="columnheader button">
+                            {{ __('common.created_at') }}
+                            @include('livewire.includes._sort-icon', ['field' => 'created_at'])
+                        </th>
+                        <th>{{ __('common.status') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($torrentRequests as $torrentRequest)
+                        <tr>
+                            <td>
+                                <a
+                                    href="{{ route('requests.show', ['torrentRequest' => $torrentRequest]) }}"
+                                >
+                                    {{ $torrentRequest->name }}
+                                </a>
+                            </td>
+                            <td>{{ $torrentRequest->category->name }}</td>
+                            <td>{{ $torrentRequest->type->name ?? 'Any' }}</td>
+                            <td>{{ $torrentRequest->resolution->name ?? 'Any' }}</td>
+                            <td>
+                                <x-user-tag
+                                    :user="$torrentRequest->user"
+                                    :anon="$torrentRequest->anon"
+                                />
+                            </td>
+                            <td>{{ $torrentRequest->bounties_count }}</td>
+                            <td>{{ $torrentRequest->comments_count }}</td>
+                            <td>{{ number_format($torrentRequest->bounty) }}</td>
+                            <td>
+                                <time
+                                    datetime="{{ $torrentRequest->created_at }}"
+                                    title="{{ $torrentRequest->created_at }}"
+                                >
+                                    {{ $torrentRequest->created_at->diffForHumans() }}
+                                </time>
+                            </td>
+                            <td>
+                                @switch(true)
+                                    @case($torrentRequest->claim_exists && $torrentRequest->torrent_id === null)
+                                        <i class="fas fa-circle text-blue"></i>
+                                        {{ __('request.claimed') }}
 
-					<div class="row">
-						<div class="form-group col-sm-12 col-xs-6">
-							<label for="extra" class="label label-default">@lang('common.extra')</label>
-							<span class="badge-user">
-								<label class="inline">
-									<input wire:model="myRequests" type="checkbox" value="{{ $user->id }}">
-									@lang('request.my-requests')
-								</label>
-							</span>
-							<span class="badge-user">
-								<label class="inline">
-									<input wire:model="myClaims" type="checkbox" value="1">
-									@lang('request.my-claims')
-								</label>
-							</span>
-							<span class="badge-user">
-								<label class="inline">
-									<input wire:model="myVoted" type="checkbox" value="1">
-									@lang('request.my-voted')
-								</label>
-							</span>
-							<span class="badge-user">
-								<label class="inline">
-									<input wire:model="myFilled" type="checkbox" value="1">
-									@lang('request.my-filled')
-								</label>
-							</span>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-		<br>
-		<div class="table-responsive block">
-			<span class="badge-user" style="float: right;">
-				<strong>@lang('request.requests'):</strong> {{ \number_format($torrentRequestStat->total) }} |
-				<strong>@lang('request.filled'):</strong> {{ \number_format($torrentRequestStat->filled) }} |
-				<strong>@lang('request.unfilled'):</strong> {{ \number_format($torrentRequestStat->unfilled) }} |
-				<strong>@lang('request.total-bounty'):</strong> {{ \number_format($torrentRequestBountyStat->total) }} @lang('bon.bon') |
-				<strong>@lang('request.bounty-claimed'):</strong> {{ \number_format($torrentRequestBountyStat->claimed) }} @lang('bon.bon') |
-				<strong>@lang('request.bounty-unclaimed'):</strong> {{ \number_format($torrentRequestBountyStat->unclaimed) }} @lang('bon.bon')
-			</span>
-			<a href="{{ route('add_request') }}" role="button" class="btn btn-xs btn-success">
-				@lang('request.add-request')
-			</a>
-			<div class="header gradient green" style="margin-top: 10px;">
-				<div class="inner_content">
-					<h5 style="font-weight: 900; font-size: 20px; margin: 8px;">
-						@lang('request.requests')
-					</h5>
-				</div>
-			</div>
-			<table class="table table-condensed table-striped table-bordered" id="requests-table">
-				<thead>
-				<tr>
-					<th class="torrents-filename">
-						<div sortable wire:click="sortBy('name')" :direction="$sortField === 'name' ? $sortDirection : null" role="button">
-							@lang('common.name')
-							@include('livewire.includes._sort-icon', ['field' => 'name'])
-						</div>
-					</th>
-					<th>
-						<div sortable wire:click="sortBy('category_id')" :direction="$sortField === 'category_id' ? $sortDirection : null" role="button">
-							@lang('common.category')
-							@include('livewire.includes._sort-icon', ['field' => 'category_id'])
-						</div>
-					</th>
-					<th>
-						<div sortable wire:click="sortBy('type_id')" :direction="$sortField === 'type_id' ? $sortDirection : null" role="button">
-							@lang('common.type')
-							@include('livewire.includes._sort-icon', ['field' => 'type_id'])
-						</div>
-					</th>
-					<th>
-						<div sortable wire:click="sortBy('resolution_id')" :direction="$sortField === 'resolution_id' ? $sortDirection : null" role="button">
-							@lang('common.resolution')
-							@include('livewire.includes._sort-icon', ['field' => 'resolution_id'])
-						</div>
-					</th>
-					<th>
-						<div sortable wire:click="sortBy('user_id')" :direction="$sortField === 'user_id' ? $sortDirection : null" role="button">
-							@lang('common.author')
-							@include('livewire.includes._sort-icon', ['field' => 'user_id'])
-						</div>
-					</th>
-					<th>
-						<div sortable wire:click="sortBy('votes')" :direction="$sortField === 'votes' ? $sortDirection : null" role="button">
-							<i class="{{ config('other.font-awesome') }} fa-thumbs-up"></i>
-							@include('livewire.includes._sort-icon', ['field' => 'votes'])
-						</div>
-					</th>
-					<th>
-						<i class="{{ config('other.font-awesome') }} fa-comment-alt-lines"></i>
-					</th>
-					<th>
-						<div sortable wire:click="sortBy('bounty')" :direction="$sortField === 'bounty' ? $sortDirection : null" role="button">
-							<i class="{{ config('other.font-awesome') }} fa-coins"></i>
-							@include('livewire.includes._sort-icon', ['field' => 'bounty'])
-						</div>
-					</th>
-					<th>
-						<div sortable wire:click="sortBy('created_at')" :direction="$sortField === 'created_at' ? $sortDirection : null" role="button">
-							@lang('common.created_at')
-							@include('livewire.includes._sort-icon', ['field' => 'created_at'])
-						</div>
-					</th>
-					<th>
-						@lang('common.status')
-					</th>
-				</tr>
-				</thead>
-				<tbody>
-				@foreach($torrentRequests as $torrentRequest)
-					<tr>							
-						<td style="vertical-align: middle;">
-							<a class="view-torrent" style="font-size: 16px; font-weight: normal;" href="{{ route('request', ['id' => $torrentRequest->id]) }}">
-								{{ $torrentRequest->name }}
-							</a>
-						</td>
-						<td style="vertical-align: middle;">
-							<span class='badge-extra'>
-								{{ $torrentRequest->category->name }}
-							</span>
-						</td>
-						<td style="vertical-align: middle;">
-							<span class='badge-extra'>
-								{{ $torrentRequest->type->name }}
-							</span>
-						</td>
-						<td style="vertical-align: middle;">
-							<span class='badge-extra'>
-								{{ $torrentRequest->resolution->name ?? 'Unknown' }}
-							</span>
-						</td>
-						<td style="vertical-align: middle;">
-							@if ($torrentRequest->anon === 0)
-								<span class="badge-user">
-                                    <a href="{{ route('users.show', ['username' => $torrentRequest->user->username]) }}">
-                                        {{ $torrentRequest->user->username }}
-                                    </a>
-                                </span>
-							@else
-								<span class="badge-user">{{ strtoupper(trans('common.anonymous')) }}
-									@if ($user->group->is_modo || $torrentRequest->user->username === $user->username)
-										<a href="{{ route('users.show', ['username' => $torrentRequest->user->username]) }}">
-                                            ({{ $torrentRequest->user->username }})
-                                        </a>
-									@endif
-                                </span>
-							@endif
-						</td>
-						<td style="vertical-align: middle;">
-                            <span class='badge-extra text-green'>
-                                {{ $torrentRequest->votes }}
-                            </span>
-						</td>
-						<td style="vertical-align: middle;">
-                            <span class='badge-extra text-green'>
-                                {{ $torrentRequest->comments_count }}
-                            </span>
-						</td>
-						<td style="vertical-align: middle;">
-                            <span class='badge-extra text-green'>
-                                {{ \number_format($torrentRequest->bounty) }}
-                            </span>
-						</td>
-						<td style="vertical-align: middle;">
-							<span class='badge-extra'>
-								{{ $torrentRequest->created_at->diffForHumans() }}
-							</span>
-						</td>
-						<td style="vertical-align: middle;">
-							@if ($torrentRequest->claimed != null && $torrentRequest->filled_hash == null)
-								<span class="label label-primary">
-									<i class="{{ config('other.font-awesome') }} fa-hand-paper"></i> @lang('request.claimed')
-								</span>
-							@elseif ($torrentRequest->filled_hash != null && $torrentRequest->approved_by == null)
-								<span class="label label-info">
-									<i class="{{ config('other.font-awesome') }} fa-question-circle"></i> @lang('request.pending')
-								</span>
-							@elseif ($torrentRequest->filled_hash == null)
-								<span class="label label-danger">
-									<i class="{{ config('other.font-awesome') }} fa-times-circle"></i> @lang('request.unfilled')
-								</span>
-							@else
-								<span class="label label-success">
-									<i class="{{ config('other.font-awesome') }} fa-check-circle"></i> @lang('request.filled')
-								</span>
-							@endif
-						</td>
-					</tr>
-				@endforeach
-				</tbody>
-			</table>
-			@if (! $torrentRequests->count())
-				<div class="margin-10">
-					@lang('common.no-result')
-				</div>
-			@endif
-			<br>
-			<div class="text-center">
-				{{ $torrentRequests->links() }}
-			</div>
-		</div>
-	</div>
+                                        @break
+                                    @case($torrentRequest->torrent_id !== null && $torrentRequest->approved_when === null)
+                                        <i class="fas fa-circle text-purple"></i>
+                                        {{ __('request.pending') }}
+
+                                        @break
+                                    @case($torrentRequest->torrent_id === null)
+                                        <i class="fas fa-circle text-red"></i>
+                                        {{ __('request.unfilled') }}
+
+                                        @break
+                                    @default
+                                        <i class="fas fa-circle text-green"></i>
+                                        {{ __('request.filled') }}
+
+                                        @break
+                                @endswitch
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="10">{{ __('common.no-result') }}</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+            {{ $torrentRequests->links('partials.pagination') }}
+        </div>
+    </section>
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ __('stat.stats') }}</h2>
+        <dl class="key-value">
+            <div class="key-value__group">
+                <dt>{{ __('request.requests') }}:</dt>
+                <dd>{{ number_format($torrentRequestStat->total) }}</dd>
+            </div>
+            <div class="key-value__group">
+                <dt>{{ __('request.filled') }}:</dt>
+                <dd>{{ number_format($torrentRequestStat->filled) }}</dd>
+            </div>
+            <div class="key-value__group">
+                <dt>{{ __('request.unfilled') }}:</dt>
+                <dd>{{ number_format($torrentRequestStat->unfilled) }}</dd>
+            </div>
+            <div class="key-value__group">
+                <dt>{{ __('request.total-bounty') }}:</dt>
+                <dd>{{ number_format($torrentRequestBountyStat->total) }} {{ __('bon.bon') }}</dd>
+            </div>
+            <div class="key-value__group">
+                <dt>{{ __('request.bounty-claimed') }}:</dt>
+                <dd>
+                    {{ number_format($torrentRequestBountyStat->claimed) }}
+                    {{ __('bon.bon') }}
+                </dd>
+            </div>
+            <div class="key-value__group">
+                <dt>{{ __('request.bounty-unclaimed') }}:</dt>
+                <dd>
+                    {{ number_format($torrentRequestBountyStat->unclaimed) }}
+                    {{ __('bon.bon') }}
+                </dd>
+            </div>
+        </dl>
+    </section>
 </div>
-

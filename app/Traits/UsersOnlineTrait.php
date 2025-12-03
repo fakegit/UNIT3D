@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -17,15 +20,13 @@ trait UsersOnlineTrait
 {
     /**
      * Check if the current user is online.
-     *
-     * @return bool
      */
-    public function isOnline()
+    public function isOnline(): bool
     {
-        if (! $this->last_action) {
+        if (!$this->last_action) {
             return false;
         }
 
-        return $this->last_action->gt(\now()->subMinutes(5));
+        return $this->last_action->gt(now()->subMinutes(5));
     }
 }

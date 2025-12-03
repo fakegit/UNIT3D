@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,9 +16,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\MassUpsertPlaylistTorrentRequest;
+use App\Http\Requests\StorePlaylistTorrentRequest;
 use App\Models\Playlist;
 use App\Models\PlaylistTorrent;
+use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 /**
  * @see \Tests\Todo\Feature\Http\Controllers\PlaylistTorrentControllerTest
@@ -24,54 +32,65 @@ class PlaylistTorrentController extends Controller
 {
     /**
      * Attach A Torrent To A Playlist.
-     *
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function store(Request $request)
+    public function store(StorePlaylistTorrentRequest $request): \Illuminate\Http\RedirectResponse
     {
-        $user = \auth()->user();
-        $playlist = Playlist::findOrFail($request->input('playlist_id'));
+        $playlist = Playlist::findOrFail($request->integer('playlist_id'));
 
-        \abort_unless($user->id === $playlist->user_id, 403);
+        abort_unless($request->user()->id === $playlist->user_id, 403);
 
-        $playlistTorrent = new PlaylistTorrent();
-        $playlistTorrent->playlist_id = $playlist->id;
-        $playlistTorrent->torrent_id = $request->input('torrent_id');
+        $playlistTorrent = PlaylistTorrent::create($request->validated());
 
-        $v = \validator($playlistTorrent->toArray(), [
-            'playlist_id'    => 'required|numeric|exists:playlists,id|unique:playlist_torrents,playlist_id,NULL,NULL,torrent_id,'.$request->input('torrent_id'),
-            'torrent_id'     => 'required|numeric|exists:torrents,id|unique:playlist_torrents,torrent_id,NULL,NULL,playlist_id,'.$request->input('playlist_id'),
-        ]);
+        $playlistTorrent->torrent()->searchable();
 
-        if ($v->fails()) {
-            return \redirect()->route('playlists.show', ['id' => $playlist->id])
-                ->withErrors($v->errors());
-        }
-        $playlistTorrent->save();
+        return to_route('playlists.show', ['playlist' => $playlist])
+            ->with('success', trans('playlist.attached-success'));
+    }
 
-        return \redirect()->route('playlists.show', ['id' => $playlist->id])
-            ->withSuccess('Torrent Has Successfully Been Attached To Your Playlist.');
+    /**
+     * Attach Torrents To A Playlist.
+     */
+    public function massUpsert(MassUpsertPlaylistTorrentRequest $request): \Illuminate\Http\RedirectResponse
+    {
+        $playlist = Playlist::findOrFail($request->integer('playlist_id'));
+
+        abort_unless($request->user()->id === $playlist->user_id, 403);
+
+        $playlistTorrents = $request->string('torrent_urls')
+            ->explode("\n")
+            ->map(fn ($url) => basename($url))
+            ->unique()
+            ->map(fn ($id) => ['playlist_id' => $playlist->id, 'torrent_id' => $id, 'tmdb_id' => 0])
+            ->toArray();
+
+        Validator::make($playlistTorrents, [
+            '*.torrent_id' => Rule::exists('torrents', 'id'),
+        ], [
+            '*.torrent_id.exists' => 'The torrent ID/URL ":input" entered was not found on site.'
+        ])->validate();
+
+        PlaylistTorrent::upsert($playlistTorrents, ['playlist_id', 'torrent_id', 'tmdb_id']);
+
+        $playlist->torrents()->searchable();
+
+        return to_route('playlists.show', ['playlist' => $playlist])
+            ->with('success', trans('playlist.attached-success'));
     }
 
     /**
      * Detach A Torrent From A Playlist.
      *
-     * @param int $id
-     *
-     * @throws \Exception
-     *
-     * @return \Illuminate\Http\RedirectResponse
+     * @throws Exception
      */
-    public function destroy($id)
+    public function destroy(Request $request, PlaylistTorrent $playlistTorrent): \Illuminate\Http\RedirectResponse
     {
-        $user = \auth()->user();
-        $playlistTorrent = PlaylistTorrent::findOrFail($id);
+        abort_unless($request->user()->group->is_modo || $request->user()->id === $playlistTorrent->playlist->user_id, 403);
 
-        \abort_unless($user->group->is_modo || $user->id === $playlistTorrent->playlist->user_id, 403);
         $playlistTorrent->delete();
 
-        return \redirect()->route('playlists.show', ['id' => $playlistTorrent->playlist->id])
-            ->withSuccess('Torrent Has Successfully Been Detached From Your Playlist.');
+        $playlistTorrent->torrent()->searchable();
+
+        return to_route('playlists.show', ['playlist' => $playlistTorrent->playlist])
+            ->with('success', trans('playlist.detached-success'));
     }
 }

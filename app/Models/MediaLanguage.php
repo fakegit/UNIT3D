@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,7 +16,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
+use AllowDynamicProperties;
 
 /**
  * App\Models\MediaLanguage.
@@ -23,17 +29,19 @@ use Illuminate\Database\Eloquent\Model;
  * @property string                          $code
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\MediaLanguage newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\MediaLanguage newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\MediaLanguage query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\MediaLanguage whereCode($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\MediaLanguage whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\MediaLanguage whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\MediaLanguage whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\MediaLanguage whereUpdatedAt($value)
- * @mixin \Eloquent
  */
-class MediaLanguage extends Model
+#[AllowDynamicProperties]
+final class MediaLanguage extends Model
 {
+    use Auditable;
+
+    /** @use HasFactory<\Database\Factories\MediaLanguageFactory> */
+    use HasFactory;
+
+    /**
+     * The attributes that aren't mass assignable.
+     *
+     * @var string[]
+     */
+    protected $guarded = ['id', 'created_at', 'updated_at'];
 }

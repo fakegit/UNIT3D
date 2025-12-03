@@ -1,78 +1,91 @@
-@extends('layout.default')
+@extends('layout.with-main')
 
 @section('title')
-    <title>@lang('ticket.helpdesk') - {{ config('other.title') }}</title>
+    <title>{{ __('ticket.helpdesk') }} - {{ config('other.title') }}</title>
 @endsection
 
-@section('breadcrumb')
-    <li>
-        <a href="{{ route('tickets.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('ticket.helpdesk')</span>
+@section('breadcrumbs')
+    <li class="breadcrumbV2">
+        <a href="{{ route('tickets.index') }}" class="breadcrumb__link">
+            {{ __('ticket.helpdesk') }}
         </a>
     </li>
-    <li>
-        <a href="{{ route('tickets.create') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('ticket.create-ticket')</span>
-        </a>
+    <li class="breadcrumb--active">
+        {{ __('ticket.create-ticket') }}
     </li>
 @endsection
 
-@section('content')
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-md-10 col-sm-10 col-md-offset-1">
-                <div class="panel panel-chat shoutbox">
-                    <div class="panel-heading"><i class="fas fa-plus"></i> @lang('ticket.create-ticket')</div>
-                    <div class="panel-body">
-                        @if(session('errors'))
-                            <div class="alert alert-danger">
-                                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                    <span aria-hidden="true">&times;</span>
-                                </button>
-                                <h6><b>@lang('ticket.fix-errors')</b></h6>
-                                <ul class="mb-0">
-                                    @foreach ($errors->all() as $error)
-                                        <li>{{ $error }}</li>
-                                    @endforeach
-                                </ul>
-                            </div>
-                        @endif
-                        <form action="{{ route('tickets.store') }}" method="POST">
-                            @csrf
-                            <div class="form-row">
-                                <div class="form-group col-6">
-                                    <label for="category">@lang('ticket.category') <span class="text-danger small">*</span></label>
-                                    <select name="category" id="category" class="form-control">
-                                        @foreach($categories as $category)
-                                            <option value="{{ $category->id }}">{{ $category->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="form-group col-6">
-                                    <label for="priority">@lang('ticket.priority') <span class="text-danger small">*</span></label>
-                                    <select name="priority" id="priority" class="form-control">
-                                        @foreach($priorities as $priority)
-                                            <option value="{{ $priority->id }}">{{ $priority->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="form-group col-12">
-                                    <label for="subject">@lang('ticket.subject') <span class="text-danger small">*</span></label>
-                                    <input type="text" class="form-control" name="subject" id="subject" placeholder="@lang('ticket.subject-enter')" autocomplete="off">
-                                </div>
-                                <div class="form-group col-12">
-                                    <label for="body">@lang('ticket.body') <span class="text-danger small">*</span></label>
-                                    <textarea name="body" id="body" cols="30" rows="3" class="form-control" placeholder="@lang('ticket.body-enter')"></textarea>
-                                </div>
-                                <div class="text-center">
-                                    <button type="submit" class="btn btn-success btn-md"><i class="fas fa-save"></i> @lang('ticket.submit-ticket')</button>
-                                    <button type="reset" class="btn btn-danger btn-md"><i class="fas fa-eraser"></i> @lang('ticket.reset')</button>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
+@section('page', 'page__ticket--create')
+
+@section('main')
+    <section class="panelV2">
+        <h2 class="panel__heading">
+            <i class="fas fa-plus"></i>
+            {{ __('ticket.create-ticket') }}
+        </h2>
+        <div class="panel__body">
+            <form
+                class="form"
+                action="{{ route('tickets.store') }}"
+                method="POST"
+                enctype="multipart/form-data"
+            >
+                @csrf
+                <p class="form__group">
+                    <select id="category_id" class="form__select" name="category_id" required>
+                        <option hidden disabled selected value=""></option>
+                        @foreach ($categories as $category)
+                            <option value="{{ $category->id }}">{{ $category->name }}</option>
+                        @endforeach
+                    </select>
+                    <label for="category_id" class="form__label form__label--floating">
+                        {{ __('ticket.category') }}
+                    </label>
+                </p>
+                <p class="form__group">
+                    <select name="priority_id" id="priority_id" class="form__select" required>
+                        <option hidden disabled selected value=""></option>
+                        @foreach ($priorities as $priority)
+                            <option value="{{ $priority->id }}">{{ $priority->name }}</option>
+                        @endforeach
+                    </select>
+                    <label for="priority_id" class="form__label form__label--floating">
+                        {{ __('ticket.priority') }}
+                    </label>
+                </p>
+                <p class="form__group">
+                    <input id="ticket_subject" class="form__text" name="subject" required />
+                    <label for="ticket_subject" class="form__label form__label--floating">
+                        {{ __('ticket.subject') }}
+                    </label>
+                </p>
+                <p class="form__group">
+                    <textarea id="body" class="form__textarea" name="body" required></textarea>
+                    <label for="body" class="form__label form__label--floating">
+                        {{ __('ticket.body') }}
+                    </label>
+                </p>
+                <p class="form__group">
+                    <label for="attachments" class="form__label">
+                        {{ __('ticket.attachments') }}
+                        <span class="text-danger small">
+                            {{ __('ticket.attachment-limit') }}
+                        </span>
+                    </label>
+                    <input
+                        id="attachments"
+                        type="file"
+                        name="attachments[]"
+                        class="upload-form-file form__file"
+                        multiple
+                    />
+                </p>
+                <p class="form__group">
+                    <button class="form__button form__button--filled">
+                        {{ __('common.submit') }}
+                    </button>
+                </p>
+            </form>
         </div>
-    </div>
+    </section>
 @endsection

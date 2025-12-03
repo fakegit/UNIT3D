@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,7 +16,8 @@
 
 namespace App\Notifications;
 
-use App\Models\TorrentRequest;
+use App\Models\TorrentRequestClaim;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -25,35 +29,54 @@ class NewRequestUnclaim extends Notification implements ShouldQueue
     /**
      * NewRequestUnclaim Constructor.
      */
-    public function __construct(public string $type, public string $sender, public TorrentRequest $torrentRequest)
+    public function __construct(public string $type, public string $sender, public TorrentRequestClaim $torrentRequestClaim)
     {
     }
 
     /**
      * Get the notification's delivery channels.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<int, string>
      */
-    public function via($notifiable)
+    public function via(object $notifiable): array
     {
         return ['database'];
     }
 
     /**
+     * Determine if the notification should be sent.
+     */
+    public function shouldSend(User $notifiable): bool
+    {
+        // Do not notify self
+        if ($this->torrentRequestClaim->user_id === $notifiable->id) {
+            return false;
+        }
+
+        if ($notifiable->notification?->block_notifications === 1) {
+            return false;
+        }
+
+        if ($notifiable->notification?->show_request_unclaim === 0) {
+            return false;
+        }
+
+        // If the sender's group ID is found in the "Block all notifications from the selected groups" array,
+        // the expression will return false.
+        return ! \in_array($this->torrentRequestClaim->user->group_id, $notifiable->notification?->json_request_groups ?? [], true);
+    }
+
+    /**
      * Get the array representation of the notification.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<string, mixed>
      */
-    public function toArray($notifiable)
+    public function toArray(object $notifiable): array
     {
         return [
             'title' => $this->sender.' Has Unclaimed One Of Your Requested Torrents',
-            'body'  => $this->sender.' has unclaimed your Requested Torrent '.$this->torrentRequest->name,
-            'url'   => \sprintf('/requests/%s', $this->torrentRequest->id),
+            'body'  => $this->sender.' has unclaimed your Requested Torrent '.$this->torrentRequestClaim->request->name,
+            'url'   => \sprintf('/requests/%s', $this->torrentRequestClaim->request->id),
         ];
     }
 }

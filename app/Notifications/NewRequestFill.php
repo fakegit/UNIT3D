@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,6 +17,7 @@
 namespace App\Notifications;
 
 use App\Models\TorrentRequest;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -25,34 +29,55 @@ class NewRequestFill extends Notification implements ShouldQueue
     /**
      * NewRequestFill Constructor.
      */
-    public function __construct(public string $type, public string $sender, public TorrentRequest $torrentRequest)
+    public function __construct(public TorrentRequest $torrentRequest)
     {
     }
 
     /**
      * Get the notification's delivery channels.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<int, string>
      */
-    public function via($notifiable)
+    public function via(object $notifiable): array
     {
         return ['database'];
     }
 
     /**
+     * Determine if the notification should be sent.
+     */
+    public function shouldSend(User $notifiable): bool
+    {
+        // Do not notify self
+        if ($this->torrentRequest->filler->id === $notifiable->id) {
+            return false;
+        }
+
+        if ($notifiable->notification?->block_notifications === 1) {
+            return false;
+        }
+
+        if ($notifiable->notification?->show_request_fill === 0) {
+            return false;
+        }
+
+        // If the sender's group ID is found in the "Block all notifications from the selected groups" array,
+        // the expression will return false.
+        return ! \in_array($this->torrentRequest->filler->group_id, $notifiable->notification?->json_request_groups ?? [], true);
+    }
+
+    /**
      * Get the array representation of the notification.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<string, mixed>
      */
-    public function toArray($notifiable)
+    public function toArray(object $notifiable): array
     {
+        $this->torrentRequest->load('filler');
+
         return [
-            'title' => $this->sender.' Has Filled One Of Your Torrent Requests',
-            'body'  => $this->sender.' has filled one of your Requested Torrents '.$this->torrentRequest->name,
+            'title' => ($this->torrentRequest->filled_anon ? 'Anonymous' : $this->torrentRequest->filler->username).' Has Filled One Of Your Torrent Requests',
+            'body'  => ($this->torrentRequest->filled_anon ? 'Anonymous' : $this->torrentRequest->filler->username).' has filled one of your Requested Torrents '.$this->torrentRequest->name,
             'url'   => \sprintf('/requests/%s', $this->torrentRequest->id),
         ];
     }

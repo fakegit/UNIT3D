@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -17,6 +20,8 @@ use App\Traits\Auditable;
 use App\Traits\Encryptable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Seedbox.
@@ -27,51 +32,37 @@ use Illuminate\Database\Eloquent\Model;
  * @property string                          $ip
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Seedbox newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Seedbox newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Seedbox query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Seedbox whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Seedbox whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Seedbox whereIp($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Seedbox whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Seedbox whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Seedbox whereUserId($value)
- * @mixin \Eloquent
  */
-class Seedbox extends Model
+#[AllowDynamicProperties]
+final class Seedbox extends Model
 {
-    use HasFactory;
-    use Encryptable;
     use Auditable;
+    use Encryptable;
+
+    /** @use HasFactory<\Database\Factories\SeedboxFactory> */
+    use HasFactory;
 
     /**
-     * The Database Table Used By The Model.
+     * The attributes that are encrypted.
      *
-     * @var string
+     * @var string[]
      */
-    protected $table = 'clients';
-
-    /**
-     * The Attributes That Are Encrypted.
-     *
-     * @var array
-     */
-    protected $encryptable = [
+    protected array $encryptable = [
         'ip',
     ];
 
+    protected $guarded = [];
+
     /**
-     * Belongs To A User.
+     * Get the user that owns the seedbox.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 }

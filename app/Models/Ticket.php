@@ -1,113 +1,142 @@
 <?php
 
+declare(strict_types=1);
+
+/**
+ * NOTICE OF LICENSE.
+ *
+ * UNIT3D Community Edition is open-sourced software licensed under the GNU Affero General Public License v3.0
+ * The details is bundled with this project in the file LICENSE.txt.
+ *
+ * @project    UNIT3D Community Edition
+ *
+ * @author     HDVinnie <hdinnovations@protonmail.com>
+ * @license    https://www.gnu.org/licenses/agpl-3.0.en.html/ GNU Affero General Public License v3.0
+ */
+
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use AllowDynamicProperties;
 
-class Ticket extends Model
+/**
+ * App\Models\Ticket.
+ *
+ * @property int                             $id
+ * @property int                             $user_id
+ * @property int                             $category_id
+ * @property int                             $priority_id
+ * @property int|null                        $staff_id
+ * @property bool                            $user_read
+ * @property bool                            $staff_read
+ * @property string                          $subject
+ * @property string                          $body
+ * @property \Illuminate\Support\Carbon|null $closed_at
+ * @property \Illuminate\Support\Carbon|null $reminded_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property string|null                     $deleted_at
+ */
+#[AllowDynamicProperties]
+final class Ticket extends Model
 {
+    use Auditable;
+
+    /** @use HasFactory<\Database\Factories\TicketFactory> */
     use HasFactory;
 
-    protected $dates = [
-        'closed_at',
-        'reminded_at',
-    ];
+    protected $guarded = [];
 
-    public function scopeStatus($query, $status)
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array{user_read: 'bool', staff_read: 'bool', closed_at: 'datetime', reminded_at: 'datetime'}
+     */
+    protected function casts(): array
     {
-        if ($status === 'all') {
-            return $query;
-        }
-
-        if ($status === 'closed') {
-            return $query->whereNotNull('closed_at');
-        } elseif ($status === 'open') {
-            return $query->whereNull('closed_at');
-        }
-    }
-
-    public function scopeStale($query)
-    {
-        return $query->with(['comments' => function ($query) {
-            $query->orderBy('id', 'desc');
-        }, 'comments.user'])
-            ->has('comments')
-            ->where('reminded_at', '<', \strtotime('+ 3 days'))
-            ->orWhereNull('reminded_at');
-    }
-
-    public static function checkForStaleTickets()
-    {
-        $open_tickets = self::status('open')
-            ->whereNotNull('staff_id')
-            ->get();
-
-        foreach ($open_tickets as $open_ticket) {
-            Comment::checkForStale($open_ticket);
-        }
+        return [
+            'user_read'   => 'bool',
+            'staff_read'  => 'bool',
+            'closed_at'   => 'datetime',
+            'reminded_at' => 'datetime',
+        ];
     }
 
     /**
-     * Belongs To A User (Created).
+     * Get the user who created the ticket.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A Staff User (Assigned).
+     * Get the staff user that was assigned the ticket.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function staff()
+    public function staff(): BelongsTo
     {
         return $this->belongsTo(User::class, 'staff_id');
     }
 
     /**
-     * Belongs To A Ticket Priority.
+     * Get the priority associated with the ticket.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<TicketPriority, $this>
      */
-    public function priority()
+    public function priority(): BelongsTo
     {
         return $this->belongsTo(TicketPriority::class);
     }
 
     /**
-     * Belongs To A Ticket Category.
+     * Get the category associated with the ticket.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<TicketCategory, $this>
      */
-    public function category()
+    public function category(): BelongsTo
     {
         return $this->belongsTo(TicketCategory::class);
     }
 
     /**
-     * Has Many Ticket Attachments.
+     * Get all attachments for the ticket.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<TicketAttachment, $this>
      */
-    public function attachments()
+    public function attachments(): HasMany
     {
         return $this->hasMany(TicketAttachment::class);
     }
 
     /**
-     * Has Many Comments.
+     * Get the comments for the ticket.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return MorphMany<Comment, $this>
      */
-    public function comments()
+    public function comments(): MorphMany
     {
-        return $this->hasMany(Comment::class);
+        return $this->morphMany(Comment::class, 'commentable');
+    }
+
+    /**
+     * Get the notes for the ticket.
+     *
+     * @return HasMany<TicketNote, $this>
+     */
+    public function notes(): HasMany
+    {
+        return $this->hasMany(TicketNote::class);
     }
 }

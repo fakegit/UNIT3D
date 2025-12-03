@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,64 +19,75 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\TorrentRequestBounty.
  *
  * @property int                             $id
  * @property int                             $user_id
- * @property float                           $seedbonus
+ * @property string                          $seedbonus
  * @property int                             $requests_id
- * @property int                             $anon
+ * @property bool                            $anon
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\TorrentRequest $request
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestBounty newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestBounty newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestBounty query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestBounty whereAnon($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestBounty whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestBounty whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestBounty whereRequestsId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestBounty whereSeedbonus($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestBounty whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentRequestBounty whereUserId($value)
- * @mixin \Eloquent
  */
-class TorrentRequestBounty extends Model
+#[AllowDynamicProperties]
+final class TorrentRequestBounty extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\TorrentRequestBountyFactory> */
+    use HasFactory;
+
     /**
-     * The Database Table Used By The Model.
+     * The table associated with the model.
      *
      * @var string
      */
     protected $table = 'request_bounty';
 
     /**
-     * Belongs To A User.
+     * The attributes that aren't mass assignable.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @var string[]
      */
-    public function user()
+    protected $guarded = ['id', 'created_at', 'updated_at'];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array{seedbonus: 'decimal:2'}
+     */
+    protected function casts(): array
+    {
+        return [
+            'seedbonus' => 'decimal:2',
+            'anon'      => 'bool',
+        ];
+    }
+
+    /**
+     * Get the user that added the bounty.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A Torrent Request.
+     * Get the request that the bounty was added to.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<TorrentRequest, $this>
      */
-    public function request()
+    public function request(): BelongsTo
     {
-        return $this->belongsTo(TorrentRequest::class);
+        return $this->belongsTo(TorrentRequest::class, 'requests_id');
     }
 }

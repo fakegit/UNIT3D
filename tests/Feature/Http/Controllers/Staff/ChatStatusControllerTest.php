@@ -1,99 +1,107 @@
 <?php
 
-namespace Tests\Feature\Http\Controllers\Staff;
-
-use App\Models\ChatStatus;
-use App\Models\Group;
-use App\Models\User;
-use Database\Seeders\GroupsTableSeeder;
-use Tests\TestCase;
+declare(strict_types=1);
 
 /**
- * @see \App\Http\Controllers\Staff\ChatStatusController
+ * NOTICE OF LICENSE.
+ *
+ * UNIT3D Community Edition is open-sourced software licensed under the GNU Affero General Public License v3.0
+ * The details is bundled with this project in the file LICENSE.txt.
+ *
+ * @project    UNIT3D Community Edition
+ *
+ * @author     HDVinnie <hdinnovations@protonmail.com>
+ * @license    https://www.gnu.org/licenses/agpl-3.0.en.html/ GNU Affero General Public License v3.0
  */
-class ChatStatusControllerTest extends TestCase
-{
-    protected function setUp(): void
-    {
-        parent::setUp();
-    }
 
-    protected function createStaffUser()
-    {
-        return User::factory()->create([
-            'group_id' => fn () => Group::factory()->create([
-                'is_owner' => true,
-                'is_admin' => true,
-                'is_modo'  => true,
-            ])->id,
-        ]);
-    }
+use App\Http\Controllers\Staff\ChatStatusController;
+use App\Http\Requests\Staff\StoreChatStatusRequest;
+use App\Http\Requests\Staff\UpdateChatStatusRequest;
+use App\Models\ChatStatus;
 
-    /**
-     * @test
-     */
-    public function destroy_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
+use function Pest\Laravel\assertDatabaseHas;
 
-        $user = $this->createStaffUser();
-        $chat_status = ChatStatus::factory()->create();
+test('create returns an ok response', function (): void {
+    $this->get(route('staff.statuses.create'))
+        ->assertOk()
+        ->assertViewIs('Staff.chat.status.create');
+});
 
-        $response = $this->actingAs($user)->delete(route('staff.statuses.destroy', ['id' => $chat_status->id]));
-        $response->assertRedirect(route('staff.statuses.index'));
-    }
+test('destroy returns an ok response', function (): void {
+    $chatStatus = ChatStatus::factory()->create();
 
-    /**
-     * @test
-     */
-    public function index_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
+    $this->delete(route('staff.statuses.destroy', [$chatStatus]))
+        ->assertRedirect(route('staff.statuses.index'))
+        ->assertSessionHasNoErrors();
 
-        $user = $this->createStaffUser();
+    $this->assertModelMissing($chatStatus);
+});
 
-        $response = $this->actingAs($user)->get(route('staff.statuses.index'));
+test('edit returns an ok response', function (): void {
+    $chatStatus = ChatStatus::factory()->create();
 
-        $response->assertOk();
-        $response->assertViewIs('Staff.chat.status.index');
-        $response->assertViewHas('chatstatuses');
-    }
+    $this->get(route('staff.statuses.edit', [$chatStatus]))
+        ->assertOk()
+        ->assertViewIs('Staff.chat.status.edit')
+        ->assertViewHas('chatstatus', $chatStatus);
+});
 
-    /**
-     * @test
-     */
-    public function store_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
+test('index returns an ok response', function (): void {
+    ChatStatus::factory()->times(3)->create();
 
-        $user = $this->createStaffUser();
-        $chat_status = ChatStatus::factory()->make();
+    $this->get(route('staff.statuses.index'))
+        ->assertOk()
+        ->assertViewIs('Staff.chat.status.index')
+        ->assertViewHas('chatstatuses');
+});
 
-        $response = $this->actingAs($user)->post(route('staff.statuses.store'), [
-            'name'  => $chat_status->name,
-            'color' => $chat_status->color,
-            'icon'  => $chat_status->icon,
-        ]);
+test('store validates with a form request', function (): void {
+    $this->assertActionUsesFormRequest(
+        ChatStatusController::class,
+        'store',
+        StoreChatStatusRequest::class
+    );
+});
 
-        $response->assertRedirect(route('staff.statuses.index'));
-    }
+test('store returns an ok response', function (): void {
+    $chatStatus = ChatStatus::factory()->make();
 
-    /**
-     * @test
-     */
-    public function update_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
+    $this->post(route('staff.statuses.store'), [
+        'name'  => $chatStatus->name,
+        'color' => $chatStatus->color,
+        'icon'  => $chatStatus->icon,
+    ])
+        ->assertRedirect(route('staff.statuses.index'))
+        ->assertSessionHasNoErrors();
 
-        $user = $this->createStaffUser();
-        $chat_status = ChatStatus::factory()->create();
+    assertDatabaseHas('chat_statuses', [
+        'name'  => $chatStatus->name,
+        'color' => $chatStatus->color,
+        'icon'  => $chatStatus->icon,
+    ]);
+});
 
-        $response = $this->actingAs($user)->post(route('staff.statuses.update', ['id' => $chat_status->id]), [
-            'name'  => $chat_status->name,
-            'color' => $chat_status->color,
-            'icon'  => $chat_status->icon,
-        ]);
+test('update validates with a form request', function (): void {
+    $this->assertActionUsesFormRequest(
+        ChatStatusController::class,
+        'update',
+        UpdateChatStatusRequest::class
+    );
+});
 
-        $response->assertRedirect(route('staff.statuses.index'));
-    }
-}
+test('update returns an ok response', function (): void {
+    $chatStatus = ChatStatus::factory()->create();
+
+    $this->post(route('staff.statuses.update', [$chatStatus]), [
+        'name'  => 'new name',
+        'color' => 'black',
+        'icon'  => 'cog',
+    ])
+        ->assertRedirect(route('staff.statuses.index'));
+
+    assertDatabaseHas('chat_statuses', [
+        'name'  => 'new name',
+        'color' => 'black',
+        'icon'  => 'cog',
+    ]);
+});

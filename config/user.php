@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * NOTICE OF LICENSE.
  *
@@ -12,7 +14,6 @@
  */
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | User Defaults
@@ -24,21 +25,21 @@ return [
 
     'group' => [
         'defaults' => [
-            'name'          => 'Orphan',
-            'slug'          => 'orphan',
-            'color'         => '#FF9966',
-            'effect'        => '',
-            'icon'          => 'fal fa-robot',
-            'is_admin'      => false,
-            'is_freeleech'  => false,
-            'is_immune'     => false,
-            'is_incognito'  => false,
-            'is_internal'   => false,
-            'is_modo'       => false,
-            'is_trusted'    => false,
-            'can_upload'    => false,
-            'level'         => 0,
-            'position'      => 0,
+            'name'         => 'Orphan',
+            'slug'         => 'orphan',
+            'color'        => '#FF9966',
+            'effect'       => '',
+            'icon'         => 'fal fa-robot',
+            'is_admin'     => false,
+            'is_freeleech' => false,
+            'is_immune'    => false,
+            'is_incognito' => false,
+            'is_internal'  => false,
+            'is_modo'      => false,
+            'is_trusted'   => false,
+            'can_upload'   => false,
+            'level'        => 0,
+            'position'     => 0,
         ],
     ],
 

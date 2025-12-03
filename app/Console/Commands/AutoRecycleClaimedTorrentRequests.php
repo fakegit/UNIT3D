@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,15 +16,12 @@
 
 namespace App\Console\Commands;
 
-use App\Models\TorrentRequest;
 use App\Models\TorrentRequestClaim;
 use App\Repositories\ChatRepository;
-use Carbon\Carbon;
 use Illuminate\Console\Command;
+use Exception;
+use Throwable;
 
-/**
- * @see \Tests\Unit\Console\Commands\AutoRecycleClaimedTorrentRequestsTest
- */
 class AutoRecycleClaimedTorrentRequests extends Command
 {
     /**
@@ -36,12 +36,12 @@ class AutoRecycleClaimedTorrentRequests extends Command
      *
      * @var string
      */
-    protected $description = 'Recycle Torrent Requests That Wwere Claimed But Not Filled Within 7 Days.';
+    protected $description = 'Recycle torrent requests that were claimed but not filled within 7 days.';
 
     /**
      * AutoRecycleClaimedTorrentRequests Constructor.
      */
-    public function __construct(private ChatRepository $chatRepository)
+    public function __construct(private readonly ChatRepository $chatRepository)
     {
         parent::__construct();
     }
@@ -49,34 +49,32 @@ class AutoRecycleClaimedTorrentRequests extends Command
     /**
      * Execute the console command.
      *
-     * @throws \Exception
-     *
-     * @return mixed
+     * @throws Exception|Throwable If there is an error during the execution of the command.
      */
-    public function handle()
+    final public function handle(): void
     {
-        $current = Carbon::now();
-        $torrentRequests = TorrentRequest::where('claimed', '=', 1)
-            ->whereNull('filled_by')
-            ->whereNull('filled_when')
-            ->whereNull('filled_hash')
-            ->get();
+        TorrentRequestClaim::query()
+            ->with('request')
+            ->where('created_at', '<', now()->subDays(7))
+            ->whereHas(
+                'request',
+                fn ($query) => $query
+                    ->whereNull('filled_by')
+                    ->whereNull('filled_when')
+                    ->whereNull('torrent_id')
+            )
+            ->chunkById(100, function ($claims): void {
+                foreach ($claims as $claim) {
+                    $trUrl = href_request($claim->request);
 
-        foreach ($torrentRequests as $torrentRequest) {
-            $requestClaim = TorrentRequestClaim::where('request_id', '=', $torrentRequest->id)
-                ->where('created_at', '<', $current->copy()->subDays(7)->toDateTimeString())
-                ->first();
-            if ($requestClaim) {
-                $trUrl = \href_request($torrentRequest);
-                $this->chatRepository->systemMessage(
-                    \sprintf('[url=%s]%s[/url] claim has been reset due to not being filled within 7 days.', $trUrl, $torrentRequest->name)
-                );
+                    $this->chatRepository->systemMessage(
+                        \sprintf('[url=%s]%s[/url] claim has been reset due to not being filled within 7 days.', $trUrl, $claim->request->name)
+                    );
 
-                $requestClaim->delete();
-                $torrentRequest->claimed = null;
-                $torrentRequest->save();
-            }
-        }
-        $this->comment('Automated Request Claim Reset Command Complete');
+                    $claim->delete();
+                }
+            });
+
+        $this->comment('Automated request claim reset command complete');
     }
 }

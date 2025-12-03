@@ -1,47 +1,51 @@
-@extends('layout.default')
+@extends('layout.with-main')
 
 @section('title')
-    <title>@lang('stat.stats') - {{ config('other.title') }}</title>
+    <title>{{ __('stat.stats') }} - {{ config('other.title') }}</title>
 @endsection
 
-@section('breadcrumb')
-    <li class="active">
-        <a href="{{ route('stats') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('stat.stats')</span>
+@section('breadcrumbs')
+    <li class="breadcrumbV2">
+        <a href="{{ route('stats') }}" class="breadcrumb__link">
+            {{ __('stat.stats') }}
         </a>
     </li>
-    <li>
-        <a href="{{ route('groups') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('stat.groups')</span>
-        </a>
+    <li class="breadcrumb--active">
+        {{ __('stat.groups') }}
     </li>
 @endsection
 
-@section('content')
-    <div class="container">
-        @include('partials.statsgroupmenu')
-        <div class="block">
-            <h2>@lang('stat.groups')</h2>
-            <hr>
-            <p class="text-red"><strong><i class="{{ config('other.font-awesome') }} fa-users"></i>
-                    @lang('stat.groups')</strong>
-                (@lang('stat.users-per-group'))</p>
-            <div class="row col-md-offset-2">
-                @foreach ($groups as $group)
-                    <div class="well col-md-3" style="margin: 10px;">
-                        <div class="text-center">
-                            <a href="{{ route('group', ['id' => $group->id]) }}">
-                                <h2 style="color:{{ $group->color }};">
-                                    <i class="{{ $group->icon }}" aria-hidden="true"></i>&nbsp;{{ $group->name }}</h2>
-                            </a>
-                            <p class="lead text-blue">{{ $group
-                                        ->users()
-                                        ->withTrashed()
-                                        ->count() }} Users</p>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
+@section('nav-tabs')
+    @include('partials.statsgroupmenu')
+@endsection
+
+@section('page', 'page__stats--groups')
+
+@section('main')
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ __('stat.groups') }}</h2>
+        <div class="data-table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>{{ __('common.group') }}</th>
+                        <th>{{ __('common.users') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($groups as $group)
+                        <tr>
+                            <td>
+                                <span style="color: {{ $group->color }}">
+                                    <i class="{{ $group->icon }}"></i>
+                                    {{ $group->name }}
+                                </span>
+                            </td>
+                            <td>{{ $group->users_count }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
         </div>
-    </div>
+    </section>
 @endsection

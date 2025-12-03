@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -19,29 +22,32 @@ class DatabaseSeeder extends Seeder
 {
     /**
      * Run the database seeds.
-     *
-     * @return void
      */
-    public function run()
+    public function run(): void
     {
         $this->call([
-            GroupsTableSeeder::class,
-            UsersTableSeeder::class,
-            BonExchangeTableSeeder::class,
-            AchievementDetailsTableSeeder::class,
-            PagesTableSeeder::class,
-            CategoriesTableSeeder::class,
-            TypesTableSeeder::class,
-            ArticlesTableSeeder::class,
-            PermissionsTableSeeder::class,
-            ForumsTableSeeder::class,
-            ChatroomTableSeeder::class,
+            GroupSeeder::class,
+            UserSeeder::class,
+            BonExchangeSeeder::class,
+            AchievementDetailSeeder::class,
+            PageSeeder::class,
+            CategorySeeder::class,
+            TypeSeeder::class,
+            ArticleSeeder::class,
+            ForumSeeder::class,
+            ForumPermissionSeeder::class,
+            ChatroomSeeder::class,
             ChatStatusSeeder::class,
-            BotsTableSeeder::class,
-            MediaLanguagesSeeder::class,
-            ResolutionsTableSeeder::class,
-            TicketCategoriesTableSeeder::class,
-            TicketPrioritiesTableSeeder::class,
+            BotSeeder::class,
+            MediaLanguageSeeder::class,
+            ResolutionSeeder::class,
+            TicketCategorySeeder::class,
+            TicketPrioritySeeder::class,
+            DistributorSeeder::class,
+            RegionSeeder::class,
+            OccupationSeeder::class,
+            BonEarningSeeder::class,
+            BonEarningConditionSeeder::class,
         ]);
     }
 }

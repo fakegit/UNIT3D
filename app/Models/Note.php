@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,6 +19,8 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Note.
@@ -26,55 +31,52 @@ use Illuminate\Database\Eloquent\Model;
  * @property string                          $message
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\User $noteduser
- * @property-read \App\Models\User $staffuser
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Note newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Note newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Note query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Note whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Note whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Note whereMessage($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Note whereStaffId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Note whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Note whereUserId($value)
- * @mixin \Eloquent
  */
-class Note extends Model
+#[AllowDynamicProperties]
+final class Note extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\NoteFactory> */
+    use HasFactory;
+
     /**
-     * The Database Table Used By The Model.
+     * The table associated with the model.
      *
      * @var string
      */
     protected $table = 'user_notes';
 
     /**
-     * Belongs To A User.
+     * The attributes that aren't mass assignable.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @var string[]
      */
-    public function noteduser()
+    protected $guarded = ['id', 'created_at', 'updated_at'];
+
+    /**
+     * Get the user that was noted.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id')->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A User.
+     * Get the staff user wrote the note.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function staffuser()
+    public function staff(): BelongsTo
     {
         return $this->belongsTo(User::class, 'staff_id')->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 }

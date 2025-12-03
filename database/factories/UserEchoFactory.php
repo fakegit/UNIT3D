@@ -1,36 +1,45 @@
 <?php
 
-/* @var \Illuminate\Database\Eloquent\Factory $factory */
+declare(strict_types=1);
+
+/**
+ * NOTICE OF LICENSE.
+ *
+ * UNIT3D Community Edition is open-sourced software licensed under the GNU Affero General Public License v3.0
+ * The details is bundled with this project in the file LICENSE.txt.
+ *
+ * @project    UNIT3D Community Edition
+ *
+ * @author     HDVinnie <hdinnovations@protonmail.com>
+ * @license    https://www.gnu.org/licenses/agpl-3.0.en.html/ GNU Affero General Public License v3.0
+ */
 
 namespace Database\Factories;
 
 use App\Models\Bot;
 use App\Models\Chatroom;
 use App\Models\User;
-use App\Models\UserEcho;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use App\Models\UserEcho;
 
+/** @extends Factory<UserEcho> */
 class UserEchoFactory extends Factory
 {
     /**
      * The name of the factory's corresponding model.
-     *
-     * @var string
      */
     protected $model = UserEcho::class;
 
     /**
      * Define the model's default state.
-     *
-     * @return array
      */
-    public function definition()
+    public function definition(): array
     {
         return [
-            'user_id'   => fn () => User::factory()->create()->id,
-            'room_id'   => fn () => Chatroom::factory()->create()->id,
-            'target_id' => fn () => User::factory()->create()->id,
-            'bot_id'    => fn () => Bot::factory()->create()->id,
+            'user_id'   => User::factory(),
+            'room_id'   => Chatroom::factory(),
+            'target_id' => User::factory(),
+            'bot_id'    => Bot::factory(),
         ];
     }
 }

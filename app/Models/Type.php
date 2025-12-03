@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,56 +19,54 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Type.
  *
  * @property int    $id
  * @property string $name
- * @property string $slug
  * @property int    $position
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\TorrentRequest[] $requests
- * @property-read int|null $requests_count
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Torrent[] $torrents
- * @property-read int|null $torrents_count
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Type newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Type newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Type query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Type whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Type whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Type wherePosition($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Type whereSlug($value)
- * @mixin \Eloquent
  */
-class Type extends Model
+#[AllowDynamicProperties]
+final class Type extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\TypeFactory> */
+    use HasFactory;
+
     /**
-     * Indicates If The Model Should Be Timestamped.
+     * Indicates if the model should be timestamped.
      *
      * @var bool
      */
     public $timestamps = false;
 
     /**
-     * Has Many Torrents.
+     * The attributes that aren't mass assignable.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @var string[]
      */
-    public function torrents()
+    protected $guarded = ['id', 'created_at', 'updated_at'];
+
+    /**
+     * Get the torrents for the type.
+     *
+     * @return HasMany<Torrent, $this>
+     */
+    public function torrents(): HasMany
     {
         return $this->hasMany(Torrent::class);
     }
 
     /**
-     * Has Many Torrent Requests.
+     * Get the requests for the type.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<TorrentRequest, $this>
      */
-    public function requests()
+    public function requests(): HasMany
     {
         return $this->hasMany(TorrentRequest::class);
     }

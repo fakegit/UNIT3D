@@ -1,132 +1,104 @@
 <?php
 
-namespace Tests\Feature\Http\Controllers\Staff;
-
-use App\Models\Group;
-use App\Models\Type;
-use App\Models\User;
-use Database\Seeders\GroupsTableSeeder;
-use Tests\TestCase;
+declare(strict_types=1);
 
 /**
- * @see \App\Http\Controllers\Staff\TypeController
+ * NOTICE OF LICENSE.
+ *
+ * UNIT3D Community Edition is open-sourced software licensed under the GNU Affero General Public License v3.0
+ * The details is bundled with this project in the file LICENSE.txt.
+ *
+ * @project    UNIT3D Community Edition
+ *
+ * @author     HDVinnie <hdinnovations@protonmail.com>
+ * @license    https://www.gnu.org/licenses/agpl-3.0.en.html/ GNU Affero General Public License v3.0
  */
-class TypeControllerTest extends TestCase
-{
-    protected function setUp(): void
-    {
-        parent::setUp();
-    }
 
-    protected function createStaffUser()
-    {
-        return User::factory()->create([
-            'group_id' => fn () => Group::factory()->create([
-                'is_owner' => true,
-                'is_admin' => true,
-                'is_modo'  => true,
-            ])->id,
-        ]);
-    }
+use App\Http\Controllers\Staff\TypeController;
+use App\Http\Requests\Staff\StoreTypeRequest;
+use App\Http\Requests\Staff\UpdateTypeRequest;
+use App\Models\Type;
 
-    /**
-     * @test
-     */
-    public function create_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
+use function Pest\Laravel\assertDatabaseHas;
 
-        $user = $this->createStaffUser();
+test('create returns an ok response', function (): void {
+    $this->get(route('staff.types.create'))
+        ->assertOk()
+        ->assertViewIs('Staff.type.create');
+});
 
-        $response = $this->actingAs($user)->get(route('staff.types.create'));
+test('destroy returns an ok response', function (): void {
+    $type = Type::factory()->create();
 
-        $response->assertOk();
-        $response->assertViewIs('Staff.type.create');
-    }
+    $this->delete(route('staff.types.destroy', [$type]))
+        ->assertRedirect(route('staff.types.index'))
+        ->assertSessionHasNoErrors();
 
-    /**
-     * @test
-     */
-    public function destroy_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
+    $this->assertModelMissing($type);
+});
 
-        $user = $this->createStaffUser();
-        $type = Type::factory()->create();
+test('edit returns an ok response', function (): void {
+    $type = Type::factory()->create();
 
-        $response = $this->actingAs($user)->delete(route('staff.types.destroy', ['id' => $type->id]));
+    $this->get(route('staff.types.edit', [$type]))
+        ->assertOk()
+        ->assertViewIs('Staff.type.edit')
+        ->assertViewHas('type', $type);
+});
 
-        $response->assertRedirect(route('staff.types.index'));
-    }
+test('index returns an ok response', function (): void {
+    Type::factory()->times(3)->create();
 
-    /**
-     * @test
-     */
-    public function edit_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
+    $this->get(route('staff.types.index'))
+        ->assertOk()
+        ->assertViewIs('Staff.type.index')
+        ->assertViewHas('types');
+});
 
-        $user = $this->createStaffUser();
-        $type = Type::factory()->create();
+test('store validates with a form request', function (): void {
+    $this->assertActionUsesFormRequest(
+        TypeController::class,
+        'store',
+        StoreTypeRequest::class
+    );
+});
 
-        $response = $this->actingAs($user)->get(route('staff.types.edit', ['id' => $type->id]));
+test('store returns an ok response', function (): void {
+    $type = Type::factory()->make();
 
-        $response->assertOk();
-        $response->assertViewIs('Staff.type.edit');
-        $response->assertViewHas('type');
-    }
+    $response = $this->post(route('staff.types.store'), [
+        'name'     => $type->name,
+        'position' => $type->position,
+    ]);
 
-    /**
-     * @test
-     */
-    public function index_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
+    $response->assertRedirect(route('staff.types.index'))->assertSessionHasNoErrors();
 
-        $user = $this->createStaffUser();
+    assertDatabaseHas('types', [
+        'name'     => $type->name,
+        'position' => $type->position,
+    ]);
+});
 
-        $response = $this->actingAs($user)->get(route('staff.types.index'));
+test('update validates with a form request', function (): void {
+    $this->assertActionUsesFormRequest(
+        TypeController::class,
+        'update',
+        UpdateTypeRequest::class
+    );
+});
 
-        $response->assertOk();
-        $response->assertViewIs('Staff.type.index');
-        $response->assertViewHas('types');
-    }
+test('update returns an ok response', function (): void {
+    $type = Type::factory()->create();
 
-    /**
-     * @test
-     */
-    public function store_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
+    $response = $this->patch(route('staff.types.update', ['type' => $type]), [
+        'name'     => 'test_name',
+        'position' => 999,
+    ]);
 
-        $user = $this->createStaffUser();
-        $type = Type::factory()->make();
+    $response->assertRedirect(route('staff.types.index'))->assertSessionHasNoErrors();
 
-        $response = $this->actingAs($user)->post(route('staff.types.store'), [
-            'name'     => $type->name,
-            'slug'     => $type->slug,
-            'position' => $type->position,
-        ]);
-
-        $response->assertRedirect(route('staff.types.index'));
-    }
-
-    /**
-     * @test
-     */
-    public function update_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
-
-        $user = $this->createStaffUser();
-        $type = Type::factory()->create();
-
-        $response = $this->actingAs($user)->patch(route('staff.types.update', ['id' => $type->id]), [
-            'name'     => $type->name,
-            'slug'     => $type->slug,
-            'position' => $type->position,
-        ]);
-
-        $response->assertRedirect(route('staff.types.index'));
-    }
-}
+    assertDatabaseHas('types', [
+        'name'     => 'test_name',
+        'position' => 999,
+    ]);
+});

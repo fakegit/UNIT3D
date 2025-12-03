@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,10 +16,10 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Bots\CasinoBot;
 use App\Bots\NerdBot;
 use App\Bots\SystemBot;
 use App\Events\Chatter;
+use App\Events\MessageDeleted;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\BotResource;
 use App\Http\Resources\ChatMessageResource;
@@ -24,13 +27,15 @@ use App\Http\Resources\ChatRoomResource;
 use App\Http\Resources\UserAudibleResource;
 use App\Http\Resources\UserEchoResource;
 use App\Models\Bot;
+use App\Models\Chatroom;
+use App\Models\ChatStatus;
+use App\Models\Message;
 use App\Models\User;
 use App\Models\UserAudible;
 use App\Models\UserEcho;
 use App\Repositories\ChatRepository;
-use Carbon\Carbon;
-use Illuminate\Contracts\Auth\Factory;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 /**
  * @see \Tests\Feature\Http\Controllers\API\ChatControllerTest
@@ -40,489 +45,414 @@ class ChatController extends Controller
     /**
      * ChatController Constructor.
      */
-    public function __construct(private ChatRepository $chatRepository, private Factory $authFactory)
+    public function __construct(private readonly ChatRepository $chatRepository)
     {
     }
 
     /* STATUSES */
-    public function statuses()
+    public function statuses(): \Illuminate\Http\JsonResponse
     {
-        return \response($this->chatRepository->statuses());
+        return response()->json(ChatStatus::all());
     }
 
     /* ECHOES */
-    public function echoes()
+    public function echoes(Request $request): \Illuminate\Http\Resources\Json\AnonymousResourceCollection
     {
-        $user = User::with(['echoes'])->findOrFail($this->authFactory->user()->id);
+        $echoes = UserEcho::query()
+            ->whereBelongsTo($request->user())
+            ->with(['bot', 'user', 'target', 'room'])
+            ->oldest('id')
+            ->get();
 
-        if (! $user->echoes || (\is_countable($user->echoes->toArray()) ? \count($user->echoes->toArray()) : 0) < 1) {
-            $userEcho = new UserEcho();
-            $userEcho->user_id = $this->authFactory->user()->id;
-            $userEcho->room_id = 1;
-            $userEcho->save();
+        if ($echoes->isEmpty()) {
+            $echoes->push(UserEcho::create([
+                'user_id' => $request->user()->id,
+                'room_id' => 1,
+            ]));
         }
 
-        return UserEchoResource::collection($this->chatRepository->echoes($this->authFactory->user()->id));
+        return UserEchoResource::collection($echoes);
     }
 
     /* AUDIBLES */
-    public function audibles()
+    public function audibles(Request $request): \Illuminate\Http\Resources\Json\AnonymousResourceCollection
     {
-        $user = User::with(['audibles'])->findOrFail($this->authFactory->user()->id);
+        $audibles = UserAudible::query()
+            ->whereBelongsTo($request->user())
+            ->with(['bot', 'user', 'target', 'room'])
+            ->latest()
+            ->get();
 
-        if (! $user->audibles || (\is_countable($user->audibles->toArray()) ? \count($user->audibles->toArray()) : 0) < 1) {
-            $userAudible = new UserAudible();
-            $userAudible->user_id = $this->authFactory->user()->id;
-            $userAudible->room_id = 1;
-            $userAudible->status = 1;
-            $userAudible->save();
+        if ($audibles->isEmpty()) {
+            $audibles->prepend(UserAudible::create([
+                'user_id' => $request->user()->id,
+                'room_id' => 1,
+                'status'  => true,
+            ]));
         }
 
-        return UserAudibleResource::collection($this->chatRepository->audibles($this->authFactory->user()->id));
+        return UserAudibleResource::collection($audibles);
     }
 
     /* BOTS */
-    public function bots()
+    public function bots(): \Illuminate\Http\Resources\Json\AnonymousResourceCollection
     {
-        return BotResource::collection($this->chatRepository->bots());
+        return BotResource::collection(Bot::all());
     }
 
     /* ROOMS */
-    public function rooms()
+    public function rooms(): \Illuminate\Http\Resources\Json\AnonymousResourceCollection
     {
-        return ChatRoomResource::collection($this->chatRepository->rooms());
+        return ChatRoomResource::collection(Chatroom::all());
     }
 
-    public function config()
+    public function config(): \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
     {
-        return \response($this->chatRepository->config());
+        return response(config('chat'));
     }
 
     /* MESSAGES */
-    public function messages($roomId)
+    public function messages(int $roomId): \Illuminate\Http\Resources\Json\AnonymousResourceCollection
     {
         return ChatMessageResource::collection($this->chatRepository->messages($roomId));
     }
 
     /* MESSAGES */
-    public function privateMessages($targetId)
+    public function privateMessages(Request $request, int $targetId): \Illuminate\Http\Resources\Json\AnonymousResourceCollection
     {
-        return ChatMessageResource::collection($this->chatRepository->privateMessages($this->authFactory->user()->id, $targetId));
+        return ChatMessageResource::collection($this->chatRepository->privateMessages($request->user()->id, $targetId));
     }
 
     /* MESSAGES */
-    public function botMessages($botId)
+    public function botMessages(Request $request, int $botId): \Illuminate\Http\Resources\Json\AnonymousResourceCollection
     {
-        $bot = Bot::where('id', '=', $botId)->firstOrFail();
-        if ($bot->is_systembot) {
-            $runbot = new SystemBot($this->chatRepository);
-        } elseif ($bot->is_nerdbot) {
-            $runbot = new NerdBot($this->chatRepository);
-        }
-        $runbot->process('message', $this->authFactory->user(), '', 0);
+        $bot = Bot::findOrFail($botId);
+        $user = $request->user();
 
-        return ChatMessageResource::collection($this->chatRepository->botMessages($this->authFactory->user()->id, $bot->id));
+        // Create echo for user if missing
+        $echoes = cache()->remember(
+            'user-echoes'.$user->id,
+            3600,
+            fn () => UserEcho::with(['user', 'room', 'target', 'bot'])->where('user_id', '=', $user->id)->get()
+        );
+
+        if ($echoes->doesntContain(fn ($echo) => $echo->bot_id == $bot->id)) {
+            $echoes->push(UserEcho::create([
+                'user_id' => $user->id,
+                'bot_id'  => $bot->id,
+            ]));
+
+            cache()->put('user-echoes'.$user->id, $echoes, 3600);
+
+            Chatter::dispatch('echo', $user->id, UserEchoResource::collection($echoes));
+        }
+
+        // Create audible for user if missing
+        $audibles = cache()->remember(
+            'user-audibles'.$user->id,
+            3600,
+            fn () => UserAudible::with(['user', 'room', 'target', 'bot'])->where('user_id', '=', $user->id)->get()
+        );
+
+        if ($audibles->doesntContain(fn ($audible) => $audible->bot_id == $bot->id)) {
+            $audibles->push(UserAudible::create([
+                'user_id' => $user->id,
+                'bot_id'  => $bot->id,
+                'status'  => false,
+            ]));
+
+            cache()->put('user-audibles'.$user->id, $audibles, 3600);
+
+            Chatter::dispatch('audible', $user->id, UserAudibleResource::collection($audibles));
+        }
+
+        return ChatMessageResource::collection($this->chatRepository->botMessages($request->user()->id, $bot->id));
     }
 
-    public function createMessage(Request $request)
+    public function createMessage(Request $request): \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response|bool|ChatMessageResource
     {
-        $user = $this->authFactory->user();
+        $user = $request->user();
 
         $userId = $user->id;
-        $receiverId = $request->input('receiver_id');
+        $receiverId = $request->integer('receiver_id');
         $roomId = $request->input('chatroom_id');
         $botId = $request->input('bot_id');
-        $message = $request->input('message');
-        $targeted = $request->input('targeted');
-        $save = $request->get('save');
+        $message = (string) $request->input('message');
 
-        if ($user->can_chat === 0) {
-            return \response('error', 401);
+        if (!($user->can_chat ?? $user->group->can_chat)) {
+            return response('error', 401);
         }
 
-        // Temp Fix For HTMLPurifier
-        if ($message === '<') {
-            return \response('error', 401);
-        }
+        $bots = cache()->remember('bots', 3600, fn () => Bot::where('active', '=', 1)->orderByDesc('position')->get());
 
-        $botDirty = 0;
-        $bots = \cache()->get('bots');
-        if (! $bots || ! \is_array($bots) || \count($bots) < 1) {
-            $bots = Bot::where('active', '=', 1)->orderBy('position', 'asc')->get();
-            $botDirty = 1;
-        }
+        if (str_starts_with($message, '/msg')) {
+            [, $username, $message] = mb_split(' +', trim($message), 3) + [null, null, ''];
 
-        if ($botDirty == 1) {
-            $expiresAt = Carbon::now()->addMinutes(60);
-            \cache()->put('bots', $bots, $expiresAt);
-        }
-
-        $which = null;
-        $target = null;
-        $runbot = null;
-        $trip = 'msg';
-        if ($message && \str_starts_with($message, '/'.$trip)) {
-            $which = 'skip';
-            $command = @\explode(' ', $message);
-            if (\array_key_exists(1, $command)) {
-                $receiverId = User::where('username', 'like', $command[1])->firstOrFail()->id;
-                $clone = $command;
-                \array_shift($clone);
-                \array_shift($clone);
-                $message = \trim(\implode(' ', $clone));
+            if ($username !== null) {
+                $receiverId = User::where('username', '=', $username)->soleValue('id');
             }
+
             $botId = 1;
-        }
+        } elseif (str_starts_with($message, '/gift')) {
+            $message = '/bot gift'.substr($message, \strlen('/gift'), \strlen($message));
 
-        $trip = 'gift';
-        if ($message && \str_starts_with($message, '/'.$trip)) {
-            $which = 'echo';
-            $target = 'system';
-            $message = '/bot gift'.\substr($message, \strlen($trip) + 1, \strlen($message));
-        }
-        if ($target == 'system') {
-            $runbot = new SystemBot($this->chatRepository);
-        }
-        if ($which == null) {
+            return new SystemBot($this->chatRepository)->process('echo', $request->user(), $message);
+        } else {
             foreach ($bots as $bot) {
-                if ($message && \str_starts_with($message, '/'.$bot->command)) {
-                    $which = 'echo';
-                } elseif ($message && \str_starts_with($message, '!'.$bot->command)) {
-                    $which = 'public';
-                } elseif ($message && \str_starts_with($message, '@'.$bot->command)) {
-                    $message = \substr($message, 1 + \strlen($bot->command), \strlen($message));
-                    $which = 'private';
-                } elseif ($message && $receiverId == 1 && $bot->id == $botId) {
-                    if (\str_starts_with($message, '/'.$bot->command)) {
-                        $message = \substr($message, 1 + \strlen($bot->command), \strlen($message));
+                $which = match (true) {
+                    str_starts_with($message, '/'.$bot->command)         => 'echo',
+                    str_starts_with($message, '!'.$bot->command)         => 'public',
+                    str_starts_with($message, '@'.$bot->command)         => 'private',
+                    $message && $receiverId === 1 && $bot->id === $botId => 'message',
+                    default                                              => null,
+                };
+
+                if ($which !== null) {
+                    if ($bot->is_systembot) {
+                        return new SystemBot($this->chatRepository)->process($which, $request->user(), $message);
                     }
-                    if ($message && \str_starts_with($message, '!'.$bot->command)) {
-                        $message = \substr($message, 1 + \strlen($bot->command), \strlen($message));
+
+                    if ($bot->is_nerdbot) {
+                        return new NerdBot($this->chatRepository)->process($which, $request->user(), $message);
                     }
-                    if ($message && \str_starts_with($message, '@'.$bot->command)) {
-                        $message = \substr($message, 1 + \strlen($bot->command), \strlen($message));
-                    }
-                    $which = 'message';
-                }
-                if ($which != null) {
-                    break;
                 }
             }
         }
 
-        if ($which != null && $which != 'skip' && ! $runbot) {
-            if ($bot->is_systembot) {
-                $runbot = new SystemBot($this->chatRepository);
-            } elseif ($bot->is_nerdbot) {
-                $runbot = new NerdBot($this->chatRepository);
-            } elseif ($bot->is_casinobot) {
-                $runbot = new CasinoBot($this->chatRepository);
-            }
-        }
-        if ($runbot !== null) {
-            return $runbot->process($which, $this->authFactory->user(), $message, 0);
-        }
-
-        $echo = false;
         if ($receiverId && $receiverId > 0) {
-            $senderDirty = 0;
-            $receiverDirty = 0;
-            $senderEchoes = \cache()->get('user-echoes'.$userId);
-            $receiverEchoes = \cache()->get('user-echoes'.$receiverId);
-            if (! $senderEchoes || ! \is_array($senderEchoes) || \count($senderEchoes) < 1) {
-                $senderEchoes = UserEcho::with(['room', 'target', 'bot'])->where('user_id', $userId)->get();
-            }
-            if (! $receiverEchoes || ! \is_array($receiverEchoes) || \count($receiverEchoes) < 1) {
-                $receiverEchoes = UserEcho::with(['room', 'target', 'bot'])->whereRaw('user_id = ?', [$receiverId])->get();
-            }
-            $senderListening = false;
-            foreach ($senderEchoes as $se => $senderEcho) {
-                if ($senderEcho['target_id'] == $receiverId) {
-                    $senderListening = true;
+            // Create echo for both users if missing
+            foreach ([[$userId, $receiverId], [$receiverId, $userId]] as [$user1Id, $user2Id]) {
+                $echoes = cache()->remember(
+                    'user-echoes'.$user1Id,
+                    3600,
+                    fn () => UserEcho::with(['user', 'room', 'target', 'bot'])->where('user_id', '=', $user1Id)->get()
+                );
+
+                if ($echoes->doesntContain(fn ($echo) => $echo->target_id == $user2Id)) {
+                    $echoes->push(UserEcho::create([
+                        'user_id'   => $user1Id,
+                        'target_id' => $user2Id,
+                    ]));
+
+                    cache()->put('user-echoes'.$user1Id, $echoes, 3600);
+
+                    Chatter::dispatch('echo', $user1Id, UserEchoResource::collection($echoes));
                 }
-            }
-            if (! $senderListening) {
-                $senderPort = new UserEcho();
-                $senderPort->user_id = $userId;
-                $senderPort->target_id = $receiverId;
-                $senderPort->save();
-                $senderEchoes = UserEcho::with(['room', 'target', 'bot'])->where('user_id', $userId)->get();
-                $senderDirty = 1;
-            }
-            $receiverListening = false;
-            foreach ($receiverEchoes as $se => $receiverEcho) {
-                if ($receiverEcho['target_id'] == $userId) {
-                    $receiverListening = true;
-                }
-            }
-            if (! $receiverListening) {
-                $receiverPort = new UserEcho();
-                $receiverPort->user_id = $receiverId;
-                $receiverPort->target_id = $userId;
-                $receiverPort->save();
-                $receiverEchoes = UserEcho::with(['room', 'target', 'bot'])->whereRaw('user_id = ?', [$receiverId])->get();
-                $receiverDirty = 1;
-            }
-            if ($senderDirty == 1) {
-                $expiresAt = Carbon::now()->addMinutes(60);
-                \cache()->put('user-echoes'.$userId, $senderEchoes, $expiresAt);
-                \event(new Chatter('echo', $userId, UserEchoResource::collection($senderEchoes)));
-            }
-            if ($receiverDirty == 1) {
-                $expiresAt = Carbon::now()->addMinutes(60);
-                \cache()->put('user-echoes'.$receiverId, $receiverEchoes, $expiresAt);
-                \event(new Chatter('echo', $receiverId, UserEchoResource::collection($receiverEchoes)));
             }
 
-            $senderDirty = 0;
-            $receiverDirty = 0;
-            $senderAudibles = \cache()->get('user-audibles'.$userId);
-            $receiverAudibles = \cache()->get('user-audibles'.$receiverId);
-            if (! $senderAudibles || ! \is_array($senderAudibles) || \count($senderAudibles) < 1) {
-                $senderAudibles = UserAudible::with(['room', 'target', 'bot'])->where('user_id', $userId)->get();
-            }
-            if (! $receiverAudibles || ! \is_array($receiverAudibles) || \count($receiverAudibles) < 1) {
-                $receiverAudibles = UserAudible::with(['room', 'target', 'bot'])->whereRaw('user_id = ?', [$receiverId])->get();
-            }
-            $senderListening = false;
-            foreach ($senderAudibles as $se => $senderEcho) {
-                if ($senderEcho['target_id'] == $receiverId) {
-                    $senderListening = true;
+            // Create audible for both users if missing
+            foreach ([[$userId, $receiverId], [$receiverId, $userId]] as [$user1Id, $user2Id]) {
+                $audibles = cache()->remember(
+                    'user-audibles'.$user1Id,
+                    3600,
+                    fn () => UserAudible::with(['user', 'room', 'target', 'bot'])->where('user_id', '=', $user1Id)->get()
+                );
+
+                if ($audibles->doesntContain(fn ($audible) => $audible->target_id == $user2Id)) {
+                    $audibles->push(UserAudible::create([
+                        'user_id'   => $user1Id,
+                        'target_id' => $user2Id,
+                        'status'    => true,
+                    ]));
+
+                    cache()->put('user-audibles'.$user1Id, $audibles, 3600);
+
+                    Chatter::dispatch('audible', $user1Id, UserAudibleResource::collection($audibles));
                 }
-            }
-            if (! $senderListening) {
-                $senderPort = new UserAudible();
-                $senderPort->user_id = $userId;
-                $senderPort->target_id = $receiverId;
-                $senderPort->status = 0;
-                $senderPort->save();
-                $senderAudibles = UserAudible::with(['room', 'target', 'bot'])->where('user_id', $userId)->get();
-                $senderDirty = 1;
-            }
-            $receiverListening = false;
-            foreach ($receiverAudibles as $se => $receiverEcho) {
-                if ($receiverEcho['target_id'] == $userId) {
-                    $receiverListening = true;
-                }
-            }
-            if (! $receiverListening) {
-                $receiverPort = new UserAudible();
-                $receiverPort->user_id = $receiverId;
-                $receiverPort->target_id = $userId;
-                $receiverPort->status = 0;
-                $receiverPort->save();
-                $receiverAudibles = UserAudible::with(['room', 'target', 'bot'])->whereRaw('user_id = ?', [$receiverId])->get();
-                $receiverDirty = 1;
-            }
-            if ($senderDirty == 1) {
-                $expiresAt = Carbon::now()->addMinutes(60);
-                \cache()->put('user-audibles'.$userId, $senderAudibles, $expiresAt);
-                \event(new Chatter('audible', $userId, UserAudibleResource::collection($senderAudibles)));
-            }
-            if ($receiverDirty == 1) {
-                $expiresAt = Carbon::now()->addMinutes(60);
-                \cache()->put('user-audibles'.$receiverId, $receiverAudibles, $expiresAt);
-                \event(new Chatter('audible', $receiverId, UserAudibleResource::collection($receiverAudibles)));
             }
 
             $roomId = 0;
             $ignore = $botId > 0 && $receiverId == 1 ? true : null;
-            $save = true;
-            $echo = true;
             $message = $this->chatRepository->privateMessage($userId, $roomId, $message, $receiverId, null, $ignore);
-        } else {
-            $receiverId = null;
-            $botId = null;
-            $message = $this->chatRepository->message($userId, $roomId, $message, $receiverId, $botId);
-        }
 
-        if (! $save) {
-            $message->delete();
-        }
-
-        if ($save && $echo) {
             return new ChatMessageResource($message);
         }
 
-        return \response('success');
+        $receiverId = null;
+        $botId = null;
+        $message = $this->chatRepository->message($userId, $roomId, $message, $receiverId, $botId);
+
+        return response('success');
     }
 
-    public function deleteMessage($id)
+    public function deleteMessage(Request $request, int $id): \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
     {
-        $this->chatRepository->deleteMessage($id);
+        $message = Message::findOrFail($id);
 
-        return \response('success');
+        abort_unless($request->user()->id === $message->user_id || $request->user()->group->is_modo, 403);
+
+        $changedByStaff = $request->user()->id !== $message->user_id;
+
+        abort_if($changedByStaff && !$request->user()->group->is_owner && $request->user()->group->level <= $message->user->group->level, 403);
+
+        broadcast(new MessageDeleted($message));
+
+        $message->delete();
+
+        return response('success');
     }
 
-    public function deleteRoomEcho(Request $request, $userId)
+    public function deleteRoomEcho(Request $request): \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
     {
-        $echo = UserEcho::where('user_id', '=', $userId)->where('room_id', '=', $request->input('room_id'))->firstOrFail();
-        $echo->delete();
+        $user = $request->user();
+        UserEcho::where('user_id', '=', $user->id)->where('room_id', '=', $request->integer('room_id'))->delete();
 
-        $user = User::with(['chatStatus', 'chatroom', 'group', 'echoes'])->findOrFail($userId);
-        $room = $this->chatRepository->roomFindOrFail($request->input('room_id'));
+        $user->load(['chatStatus', 'chatroom', 'group', 'echoes']);
+        $room = Chatroom::findOrFail($request->integer('room_id'));
 
         $user->chatroom()->dissociate();
         $user->chatroom()->associate($room);
 
         $user->save();
 
-        $senderEchoes = UserEcho::with(['room', 'target', 'bot'])->where('user_id', $userId)->get();
+        $senderEchoes = UserEcho::with(['room', 'target', 'bot'])->where('user_id', $user->id)->get();
 
         $expiresAt = Carbon::now()->addMinutes(60);
-        \cache()->put('user-echoes'.$userId, $senderEchoes, $expiresAt);
-        \event(new Chatter('echo', $userId, UserEchoResource::collection($senderEchoes)));
+        cache()->put('user-echoes'.$user->id, $senderEchoes, $expiresAt);
+        event(new Chatter('echo', $user->id, UserEchoResource::collection($senderEchoes)));
 
-        return \response($user);
+        /**
+         * @see https://github.com/laravel/framework/blob/48246da2320c95a17bfae922d36264105a917906/src/Illuminate/Http/Response.php#L56
+         * @phpstan-ignore-next-line Laravel automatically converts models to json
+         */
+        return response($user);
     }
 
-    public function deleteTargetEcho(Request $request, $userId)
+    public function deleteTargetEcho(Request $request): \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
     {
-        $echo = UserEcho::where('user_id', '=', $userId)->where('target_id', '=', $request->input('target_id'))->firstOrFail();
-        $echo->delete();
+        $user = $request->user();
+        UserEcho::where('user_id', '=', $user->id)->where('target_id', '=', $request->input('target_id'))->delete();
 
-        $user = User::with(['chatStatus', 'chatroom', 'group', 'echoes'])->findOrFail($userId);
-        $senderEchoes = UserEcho::with(['room', 'target', 'bot'])->where('user_id', $userId)->get();
+        $user->load(['chatStatus', 'chatroom', 'group', 'echoes']);
+        $senderEchoes = UserEcho::with(['room', 'target', 'bot'])->where('user_id', $user->id)->get();
 
         $expiresAt = Carbon::now()->addMinutes(60);
-        \cache()->put('user-echoes'.$userId, $senderEchoes, $expiresAt);
-        \event(new Chatter('echo', $userId, UserEchoResource::collection($senderEchoes)));
+        cache()->put('user-echoes'.$user->id, $senderEchoes, $expiresAt);
+        event(new Chatter('echo', $user->id, UserEchoResource::collection($senderEchoes)));
 
-        return \response($user);
+        /**
+         * @see https://github.com/laravel/framework/blob/48246da2320c95a17bfae922d36264105a917906/src/Illuminate/Http/Response.php#L56
+         * @phpstan-ignore-next-line Laravel automatically converts models to json
+         */
+        return response($user);
     }
 
-    public function deleteBotEcho(Request $request, $userId)
+    public function deleteBotEcho(Request $request): \Illuminate\Http\JsonResponse
     {
-        $echo = UserEcho::where('user_id', '=', $userId)->where('bot_id', '=', $request->input('bot_id'))->firstOrFail();
-        $echo->delete();
+        $user = $request->user();
+        UserEcho::where('user_id', '=', $user->id)->where('bot_id', '=', $request->input('bot_id'))->delete();
 
-        $user = User::with(['chatStatus', 'chatroom', 'group', 'echoes'])->findOrFail($userId);
-        $senderEchoes = UserEcho::with(['room', 'target', 'bot'])->where('user_id', $userId)->get();
+        $user->load(['chatStatus', 'chatroom', 'group', 'echoes']);
+        $senderEchoes = UserEcho::with(['room', 'target', 'bot'])->where('user_id', $user->id)->get();
 
         $expiresAt = Carbon::now()->addMinutes(60);
-        \cache()->put('user-echoes'.$userId, $senderEchoes, $expiresAt);
-        \event(new Chatter('echo', $userId, UserEchoResource::collection($senderEchoes)));
+        cache()->put('user-echoes'.$user->id, $senderEchoes, $expiresAt);
+        event(new Chatter('echo', $user->id, UserEchoResource::collection($senderEchoes)));
 
-        return \response($user);
+        return response()->json($user);
     }
 
-    public function toggleRoomAudible(Request $request, $userId)
+    public function toggleRoomAudible(Request $request): \Illuminate\Http\JsonResponse
     {
-        $echo = UserAudible::where('user_id', '=', $userId)->where('room_id', '=', $request->input('room_id'))->firstOrFail();
-        $echo->status = ($echo->status == 1 ? 0 : 1);
+        $user = $request->user();
+        $echo = UserAudible::where('user_id', '=', $user->id)->where('room_id', '=', $request->input('room_id'))->sole();
+        $echo->status = !$echo->status;
         $echo->save();
 
-        $user = User::with(['chatStatus', 'chatroom', 'group', 'audibles', 'audibles'])->findOrFail($userId);
-        $senderAudibles = UserAudible::with(['room', 'target', 'bot'])->where('user_id', $userId)->get();
+        $user->load(['chatStatus', 'chatroom', 'group', 'audibles', 'audibles']);
+        $senderAudibles = UserAudible::with(['room', 'target', 'bot'])->where('user_id', $user->id)->get();
 
         $expiresAt = Carbon::now()->addMinutes(60);
-        \cache()->put('user-audibles'.$userId, $senderAudibles, $expiresAt);
-        \event(new Chatter('audible', $userId, UserAudibleResource::collection($senderAudibles)));
+        cache()->put('user-audibles'.$user->id, $senderAudibles, $expiresAt);
+        event(new Chatter('audible', $user->id, UserAudibleResource::collection($senderAudibles)));
 
-        return \response($user);
+        return response()->json($user);
     }
 
-    public function toggleTargetAudible(Request $request, $userId)
+    public function toggleTargetAudible(Request $request): \Illuminate\Http\JsonResponse
     {
-        $echo = UserAudible::where('user_id', '=', $userId)->where('target_id', '=', $request->input('target_id'))->firstOrFail();
-        $echo->status = ($echo->status == 1 ? 0 : 1);
+        $user = $request->user();
+        $echo = UserAudible::where('user_id', '=', $user->id)->where('target_id', '=', $request->input('target_id'))->sole();
+        $echo->status = !$echo->status;
         $echo->save();
 
-        $user = User::with(['chatStatus', 'chatroom', 'group', 'audibles', 'audibles'])->findOrFail($userId);
-        $senderAudibles = UserAudible::with(['target', 'room', 'bot'])->where('user_id', $userId)->get();
+        $user->load(['chatStatus', 'chatroom', 'group', 'audibles', 'audibles']);
+        $senderAudibles = UserAudible::with(['target', 'room', 'bot'])->where('user_id', $user->id)->get();
 
         $expiresAt = Carbon::now()->addMinutes(60);
-        \cache()->put('user-audibles'.$userId, $senderAudibles, $expiresAt);
-        \event(new Chatter('audible', $userId, UserAudibleResource::collection($senderAudibles)));
+        cache()->put('user-audibles'.$user->id, $senderAudibles, $expiresAt);
+        event(new Chatter('audible', $user->id, UserAudibleResource::collection($senderAudibles)));
 
-        return \response($user);
+        return response()->json($user);
     }
 
-    public function toggleBotAudible(Request $request, $userId)
+    public function toggleBotAudible(Request $request): \Illuminate\Http\JsonResponse
     {
-        $echo = UserAudible::where('user_id', '=', $userId)->where('bot_id', '=', $request->input('bot_id'))->firstOrFail();
-        $echo->status = ($echo->status == 1 ? 0 : 1);
+        $user = $request->user();
+        $echo = UserAudible::where('user_id', '=', $user->id)->where('bot_id', '=', $request->input('bot_id'))->sole();
+        $echo->status = !$echo->status;
         $echo->save();
 
-        $user = User::with(['chatStatus', 'chatroom', 'group', 'audibles', 'audibles'])->findOrFail($userId);
-        $senderAudibles = UserAudible::with(['bot', 'room', 'bot'])->where('user_id', $userId)->get();
+        $user->load(['chatStatus', 'chatroom', 'group', 'audibles', 'audibles'])->findOrFail($user->id);
+        $senderAudibles = UserAudible::with(['bot', 'room', 'bot'])->where('user_id', $user->id)->get();
 
         $expiresAt = Carbon::now()->addMinutes(60);
-        \cache()->put('user-audibles'.$userId, $senderAudibles, $expiresAt);
-        \event(new Chatter('audible', $userId, UserAudibleResource::collection($senderAudibles)));
+        cache()->put('user-audibles'.$user->id, $senderAudibles, $expiresAt);
+        event(new Chatter('audible', $user->id, UserAudibleResource::collection($senderAudibles)));
 
-        return \response($user);
+        return response()->json($user);
     }
 
     /* USERS */
-    public function updateUserChatStatus(Request $request, $id)
+    public function updateUserChatStatus(Request $request): \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
     {
-        $systemUser = User::where('username', 'System')->firstOrFail();
+        $user = $request->user();
+        $status = ChatStatus::findOrFail($request->integer('status_id'));
 
-        $user = User::with(['chatStatus', 'chatroom', 'group', 'echoes'])->findOrFail($id);
-        $status = $this->chatRepository->statusFindOrFail($request->input('status_id'));
-
-        $log = '[url=/users/'.$user->username.']'.$user->username.'[/url] has updated their status to [b]'.$status->name.'[/b]';
-
-        $message = $this->chatRepository->message($systemUser->id, $user->chatroom->id, $log, null);
-        $message->save();
+        $this->chatRepository->systemMessage('[url=/users/'.$user->username.']'.$user->username.'[/url] has updated their status to [b]'.$status->name.'[/b]');
 
         $user->chatStatus()->dissociate();
         $user->chatStatus()->associate($status);
         $user->save();
 
-        return \response($user);
+        return response('success');
     }
 
-    public function updateUserRoom(Request $request, $id)
+    public function updateUserRoom(Request $request): \Illuminate\Http\JsonResponse
     {
-        $user = User::with(['chatStatus', 'chatroom', 'group', 'echoes'])->findOrFail($id);
-        $room = $this->chatRepository->roomFindOrFail($request->input('room_id'));
+        $user = $request->user();
+        $room = Chatroom::findOrFail($request->integer('room_id'));
 
         $user->chatroom()->dissociate();
         $user->chatroom()->associate($room);
 
         $user->save();
 
-        $senderDirty = 0;
-        $senderEchoes = \cache()->get('user-echoes'.$id);
-        if (! $senderEchoes || ! \is_array($senderEchoes) || \count($senderEchoes) < 1) {
-            $senderEchoes = UserEcho::with(['room', 'target', 'bot'])->whereRaw('user_id = ?', [$id])->get();
-        }
-        $senderListening = false;
-        foreach ($senderEchoes as $se => $senderEcho) {
-            if ($senderEcho['room_id'] == $room->id) {
-                $senderListening = true;
-            }
-        }
-        if (! $senderListening) {
-            $userEcho = new UserEcho();
-            $userEcho->user_id = $id;
-            $userEcho->room_id = $room->id;
-            $userEcho->save();
-            $senderEchoes = UserEcho::with(['room', 'target', 'bot'])->whereRaw('user_id = ?', [$id])->get();
-            $senderDirty = 1;
-        }
-        if ($senderDirty == 1) {
-            $expiresAt = Carbon::now()->addMinutes(60);
-            \cache()->put('user-echoes'.$id, $senderEchoes, $expiresAt);
-            \event(new Chatter('echo', $id, UserEchoResource::collection($senderEchoes)));
+        // Create echo for user if missing
+        $echoes = cache()->remember(
+            'user-echoes'.$user->id,
+            3600,
+            fn () => UserEcho::with(['user', 'room', 'target', 'bot'])->where('user_id', '=', $user->id)->get(),
+        );
+
+        if ($echoes->doesntContain(fn ($echo) => $echo->room_id == $room->id)) {
+            $echoes->push(UserEcho::create([
+                'user_id' => $user->id,
+                'room_id' => $room->id,
+            ]));
+
+            cache()->put('user-echoes'.$user->id, $echoes, 3600);
+
+            Chatter::dispatch('echo', $user->id, UserEchoResource::collection($echoes));
         }
 
-        return \response($user);
+        return response()->json($user);
     }
 
-    public function updateUserTarget($id)
+    public function updateUserTarget(Request $request): \Illuminate\Http\JsonResponse
     {
-        $user = User::with(['chatStatus', 'chatroom', 'group', 'echoes'])->findOrFail($id);
+        $user = $request->user()->load(['chatStatus', 'chatroom', 'group', 'echoes']);
 
-        return \response($user);
-    }
-
-    public function updateBotTarget($id)
-    {
-        $user = User::with(['chatStatus', 'chatroom', 'group', 'echoes'])->findOrFail($id);
-
-        return \response($user);
+        return response()->json($user);
     }
 }

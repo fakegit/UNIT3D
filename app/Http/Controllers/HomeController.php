@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,20 +17,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Article;
-use App\Models\Bookmark;
+use App\Models\Comment;
 use App\Models\FeaturedTorrent;
-use App\Models\FreeleechToken;
 use App\Models\Group;
-use App\Models\PersonalFreeleech;
 use App\Models\Poll;
 use App\Models\Post;
 use App\Models\Topic;
-use App\Models\Torrent;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Exception;
 
 /**
  * @see \Tests\Todo\Feature\Http\Controllers\Staff\HomeControllerTest
@@ -37,122 +36,113 @@ class HomeController extends Controller
     /**
      * Display Home Page.
      *
-     *
-     * @throws \Exception
+     * @throws Exception
      */
     public function index(Request $request): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
         // For Cache
-        $current = Carbon::now();
-        $expiresAt = $current->addMinutes(1);
+        $expiresAt = [now()->addMinutes(5), now()->addMinutes(10)];
 
         // Authorized User
-        $user = $request->user();
+        $user = $request->user()->load('settings');
 
-        // Latest Articles/News Block
-        $articles = \cache()->remember('latest_article', $expiresAt, fn () => Article::latest()->take(1)->get());
-        foreach ($articles as $article) {
-            $article->newNews = ($user->updated_at->subDays(3)->getTimestamp() < $article->created_at->getTimestamp()) ? 1 : 0;
-        }
-
-        // Latest Torrents Block
-        $personalFreeleech = PersonalFreeleech::where('user_id', '=', $user->id)->first();
-
-        $newest = \cache()->remember('newest_torrents', $expiresAt, fn () => Torrent::with(['user', 'category', 'type'])
-            ->withCount(['thanks', 'comments'])
-            ->latest()
-            ->take(5)
-            ->get());
-
-        $seeded = \cache()->remember('seeded_torrents', $expiresAt, fn () => Torrent::with(['user', 'category', 'type'])
-            ->withCount(['thanks', 'comments'])
-            ->latest('seeders')
-            ->take(5)
-            ->get());
-
-        $leeched = \cache()->remember('leeched_torrents', $expiresAt, fn () => Torrent::with(['user', 'category', 'type'])
-            ->withCount(['thanks', 'comments'])
-            ->latest('leechers')
-            ->take(5)
-            ->get());
-
-        $dying = \cache()->remember('dying_torrents', $expiresAt, fn () => Torrent::with(['user', 'category', 'type'])
-            ->withCount(['thanks', 'comments'])
-            ->where('seeders', '=', 1)
-            ->where('times_completed', '>=', 1)
-            ->latest('leechers')
-            ->take(5)
-            ->get());
-
-        $dead = \cache()->remember('dead_torrents', $expiresAt, fn () => Torrent::with(['user', 'category', 'type'])
-            ->withCount(['thanks', 'comments'])
-            ->where('seeders', '=', 0)
-            ->latest('leechers')
-            ->take(5)
-            ->get());
-
-        // Latest Topics Block
-        $topics = \cache()->remember('latest_topics', $expiresAt, fn () => Topic::with('forum')->latest()->take(5)->get());
-
-        // Latest Posts Block
-        $posts = \cache()->remember('latest_posts', $expiresAt, fn () => Post::with('topic', 'user')->latest()->take(5)->get());
-
-        // Online Block
-        $users = \cache()->remember('online_users', $expiresAt, fn () => User::with('group', 'privacy')
-            ->withCount([
-                'warnings' => function (Builder $query) {
-                    $query->whereNotNull('torrent')->where('active', '1');
-                },
-            ])
-            ->where('last_action', '>', \now()->subMinutes(5))
-            ->get());
-
-        $groups = \cache()->remember('user-groups', $expiresAt, fn () => Group::select(['name', 'color', 'effect', 'icon'])->oldest('position')->get());
-
-        // Featured Torrents Block
-        $featured = \cache()->remember('latest_featured', $expiresAt, fn () => FeaturedTorrent::with('torrent')->get());
-
-        // Latest Poll Block
-        $poll = \cache()->remember('latest_poll', $expiresAt, fn () => Poll::latest()->first());
-
-        // Top Uploaders Block
-        $uploaders = \cache()->remember('top_uploaders', $expiresAt, fn () => Torrent::with('user')
-            ->select(DB::raw('user_id, count(*) as value'))
-            ->groupBy('user_id')
-            ->latest('value')
-            ->take(10)
-            ->get());
-
-        $pastUploaders = \cache()->remember('month_uploaders', $expiresAt, fn () => Torrent::with('user')
-            ->where('created_at', '>', $current->copy()->subDays(30)->toDateTimeString())
-            ->select(DB::raw('user_id, count(*) as value'))
-            ->groupBy('user_id')
-            ->latest('value')
-            ->take(10)
-            ->get());
-
-        $freeleechTokens = FreeleechToken::where('user_id', $user->id)->get();
-        $bookmarks = Bookmark::where('user_id', $user->id)->get();
-
-        return \view('home.index', [
-            'user'               => $user,
-            'personal_freeleech' => $personalFreeleech,
-            'users'              => $users,
-            'groups'             => $groups,
-            'articles'           => $articles,
-            'newest'             => $newest,
-            'seeded'             => $seeded,
-            'dying'              => $dying,
-            'leeched'            => $leeched,
-            'dead'               => $dead,
-            'topics'             => $topics,
-            'posts'              => $posts,
-            'featured'           => $featured,
-            'poll'               => $poll,
-            'uploaders'          => $uploaders,
-            'past_uploaders'     => $pastUploaders,
-            'freeleech_tokens'   => $freeleechTokens,
-            'bookmarks'          => $bookmarks,
+        return view('home.index', [
+            'user'   => $user,
+            'blocks' => collect(
+                [
+                    'news', 'chat', 'featured', 'random_media', 'poll',
+                    'top_torrents', 'top_users', 'latest_topics', 'latest_posts',
+                    'latest_comments', 'online'
+                ]
+            )
+                ->map(fn ($block) => [
+                    'key'      => $block,
+                    'visible'  => $user->settings->{"{$block}_block_visible"},
+                    'position' => $user->settings->{"{$block}_block_position"},
+                ])
+                ->sortBy('position')
+                ->filter(fn ($block) => $block['visible'])
+                ->pluck('key')
+                ->toArray(),
+            'users' => cache()->flexible(
+                'online_users:by-group:'.auth()->user()->group_id,
+                $expiresAt,
+                fn () => User::with('group', 'privacy')
+                    ->withCount([
+                        'warnings' => function (Builder $query): void {
+                            $query->whereNotNull('torrent_id')->where('active', true);
+                        },
+                    ])
+                    ->where('last_action', '>', now()->subMinutes(60))
+                    ->orderByRaw('(select position from "groups" where "groups".id = users.group_id), group_id, username')
+                    ->get()
+                    ->sortBy(fn ($user) => $user->privacy?->hidden || ! $user->isVisible($user, 'other', 'show_online')),
+            ),
+            'groups' => cache()->flexible(
+                'user-groups',
+                $expiresAt,
+                fn () => Group::select([
+                    'id',
+                    'name',
+                    'color',
+                    'effect',
+                    'icon',
+                ])
+                    ->oldest('position')
+                    ->get()
+            ),
+            'articles' => Article::query()
+                ->latest()
+                ->limit(3)
+                ->withExists(['unreads' => fn ($query) => $query->whereBelongsTo($user)])
+                ->get(),
+            'topics' => Topic::query()
+                ->with(['user', 'user.group', 'latestPoster', 'reads' => fn ($query) => $query->whereBelongsTo($user)])
+                ->authorized(canReadTopic: true)
+                ->latest()
+                ->take(5)
+                ->get(),
+            'posts' => cache()->flexible(
+                'latest_posts:by-group:'.auth()->user()->group_id,
+                $expiresAt,
+                fn () => Post::query()
+                    ->with('user', 'user.group', 'topic:id,name')
+                    ->withCount('likes', 'dislikes', 'authorPosts', 'authorTopics')
+                    ->withSum('tips', 'bon')
+                    ->withExists([
+                        'likes'    => fn ($query) => $query->where('user_id', '=', auth()->id()),
+                        'dislikes' => fn ($query) => $query->where('user_id', '=', auth()->id()),
+                    ])
+                    ->authorized(canReadTopic: true)
+                    ->latest()
+                    ->take(5)
+                    ->get(),
+            ),
+            'comments' => cache()->flexible(
+                'latest_comments',
+                $expiresAt,
+                fn () => Comment::query()
+                    ->with('user', 'user.group', 'commentable')
+                    ->whereHasMorph('commentable', [\App\Models\Torrent::class])
+                    ->orWhereHasMorph('commentable', [\App\Models\TorrentRequest::class])
+                    ->latest()
+                    ->take(5)
+                    ->get(),
+            ),
+            'featured' => cache()->flexible(
+                'latest_featured',
+                $expiresAt,
+                fn () => FeaturedTorrent::with([
+                    'torrent' => ['resolution', 'type', 'category'],
+                    'user.group',
+                ])->get(),
+            ),
+            'poll' => cache()->flexible('latest_poll', $expiresAt, function () {
+                return Poll::where(function ($query): void {
+                    $query->where('expires_at', '>', now())
+                        ->orWhereNull('expires_at');
+                })->latest()->first();
+            }),
         ]);
     }
 }

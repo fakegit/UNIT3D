@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,6 +16,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreSubscriptionRequest;
 use App\Models\Forum;
 use App\Models\Subscription;
 use App\Models\Topic;
@@ -24,122 +28,60 @@ use Illuminate\Http\Request;
 class SubscriptionController extends Controller
 {
     /**
-     * Subscribe To A Topic.
-     *
-     *
-     * @return \Illuminate\Http\RedirectResponse
+     * View Subscribed Forums & Topics.
      */
-    public function subscribeTopic(Request $request, string $route, Topic $topic)
+    public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        if ($route === 'subscriptions') {
-            $logger = 'forum_subscriptions';
-            $params = [];
-        }
-        if (! isset($logger)) {
-            $logger = 'forum_topic';
-            $params = ['id' => $topic->id];
-        }
-
-        if (! $request->user()->isSubscribed('topic', $topic->id)) {
-            $subscription = new Subscription();
-            $subscription->user_id = $request->user()->id;
-            $subscription->topic_id = $topic->id;
-            $subscription->save();
-
-            return \redirect()->route($logger, $params)
-                ->withSuccess('You are now subscribed to topic, '.$topic->name.'. You will now receive site notifications when a reply is left.');
-        }
-
-        return \redirect()->route($logger, $params)
-            ->withErrors('You are already subscribed to this topic');
+        return view('forum.subscriptions');
     }
 
     /**
-     * Unsubscribe To A Topic.
-     *
-     *
-     * @return \Illuminate\Http\RedirectResponse
+     * Store a subscription.
      */
-    public function unsubscribeTopic(Request $request, string $route, Topic $topic)
+    public function store(StoreSubscriptionRequest $request): \Illuminate\Http\RedirectResponse
     {
-        if ($route === 'subscriptions') {
-            $logger = 'forum_subscriptions';
-            $params = [];
-        }
-        if (! isset($logger)) {
-            $logger = 'forum_topic';
-            $params = ['id' => $topic->id];
-        }
+        switch (true) {
+            case $request->has('forum_id') === true:
+                abort_unless(
+                    Forum::query()
+                        ->where('id', '=', $request->forum_id)
+                        ->authorized(canReadTopic: true)
+                        ->exists(),
+                    403
+                );
+                $request->user()->subscribedForums()->attach($request->forum_id);
 
-        if ($request->user()->isSubscribed('topic', $topic->id)) {
-            $subscription = $request->user()->subscriptions()->where('topic_id', '=', $topic->id)->first();
-            $subscription->delete();
+                return back()
+                    ->with('success', 'You are now subscribed to this forum. You will now receive site notifications when a topic is started.');
 
-            return \redirect()->route($logger, $params)
-                ->withSuccess('You are no longer subscribed to topic, '.$topic->name.'. You will no longer receive site notifications when a reply is left.');
+            case $request->has('topic_id') === true:
+                abort_unless(
+                    Topic::query()
+                        ->where('id', '=', $request->topic_id)
+                        ->authorized(canReadTopic: true)
+                        ->exists(),
+                    403
+                );
+
+                $request->user()->subscribedTopics()->attach($request->topic_id);
+
+                return back()
+                    ->with('success', 'You are now subscribed to this topic. You will now receive site notifications when a reply is left.');
+
+            default:
+                return back()->withErrors(['Failed to subscribe.']);
         }
-
-        return \redirect()->route($logger, $params)
-            ->withErrors('You are not subscribed this topic to begin with...');
     }
 
     /**
-     * Subscribe To A Forum.
-     *
-     *
-     * @return \Illuminate\Http\RedirectResponse
+     * Destroy a subscription.
      */
-    public function subscribeForum(Request $request, string $route, Forum $forum)
+    public function destroy(Request $request, Subscription $subscription): \Illuminate\Http\RedirectResponse
     {
-        if ($route === 'subscriptions') {
-            $logger = 'forum_subscriptions';
-            $params = [];
-        }
-        if (! isset($logger)) {
-            $logger = 'forums.show';
-            $params = ['id' => $forum->id];
-        }
+        abort_unless($subscription->user_id === $request->user()->id, 403);
 
-        if (! $request->user()->isSubscribed('forum', $forum->id)) {
-            $subscription = new Subscription();
-            $subscription->user_id = $request->user()->id;
-            $subscription->forum_id = $forum->id;
-            $subscription->save();
+        $subscription->delete();
 
-            return \redirect()->route($logger, $params)
-                ->withSuccess('You are now subscribed to forum, '.$forum->name.'. You will now receive site notifications when a topic is started.');
-        }
-
-        return \redirect()->route($logger, $params)
-            ->withErrors('You are already subscribed to this forum');
-    }
-
-    /**
-     * Unsubscribe To A Forum.
-     *
-     *
-     * @return \Illuminate\Http\RedirectResponse
-     */
-    public function unsubscribeForum(Request $request, string $route, Forum $forum)
-    {
-        if ($route === 'subscriptions') {
-            $logger = 'forum_subscriptions';
-            $params = [];
-        }
-        if (! isset($logger)) {
-            $logger = 'forums.show';
-            $params = ['id' => $forum->id];
-        }
-
-        if ($request->user()->isSubscribed('forum', $forum->id)) {
-            $subscription = $request->user()->subscriptions()->where('forum_id', '=', $forum->id)->first();
-            $subscription->delete();
-
-            return \redirect()->route($logger, $params)
-                ->withSuccess('You are no longer subscribed to forum, '.$forum->name.'. You will no longer receive site notifications when a topic is started.');
-        }
-
-        return \redirect()->route($logger, $params)
-            ->withErrors('You are not subscribed this forum to begin with...');
+        return back()->with('success', 'You are now unsubscribed.');
     }
 }

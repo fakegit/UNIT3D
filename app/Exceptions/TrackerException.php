@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,8 +17,9 @@
 namespace App\Exceptions;
 
 use Throwable;
+use Exception;
 
-class TrackerException extends \Exception
+class TrackerException extends Exception
 {
     protected const ERROR_MSG = [
         // Error message of base Tracker system
@@ -35,6 +39,7 @@ class TrackerException extends \Exception
         126 => 'Client :ua is not acceptable! Please check our Whitelist.',
         127 => 'Client :ua banned due to: :comment .',
         128 => 'Client :ua is not acceptable! Please check our Blacklist.',
+        129 => 'Invalid request !',
 
         // Error message about Requests ( Part.2 request params )
         130 => 'key: :attribute is Missing !',
@@ -48,18 +53,19 @@ class TrackerException extends \Exception
         138 => 'You have reached a rate limit. You can only seed/leech a single torrent from upto :limit locations.',
 
         // Error message about User Account
-        140 => 'Passkey does not esist! Please Re-download the .torrent',
+        140 => 'Passkey does not exist! Please Re-download the .torrent',
         141 => 'Your account is not enabled! ( Current `:status` )',
         142 => 'Your downloading privileges have been disabled! (Read the rules)',
 
         // Error message about Torrent
         150 => 'Torrent not registered with this tracker.',
         151 => 'You do not have permission to access a :status torrent.',
+        152 => 'Torrent being announced as complete but no record found.',
 
         // Error message about Download Session
         160 => 'You cannot seed the same torrent from more than :count locations.',
         161 => 'You are already downloading the same torrent. You can only leech from :count location at a time!',
-        162 => 'There is a minimum announce lock of :min seconds, please wait.',
+        162 => 'You last announced :elapsed s ago. Please respect the min interval.',
         163 => 'Your ratio is too low! You need to wait :sec seconds to start.',
         164 => 'Your slot limit is reached! You may at most download :max torrents at the same time',
 
@@ -73,16 +79,14 @@ class TrackerException extends \Exception
 
     /**
      * TrackerException constructor.
-     *
-     * @param array|null      $replace
-     * @param \Throwable|null $throwable
      */
-    public function __construct(int $code = 999, array $replace = null, Throwable $throwable = null)
+    public function __construct(int $code = 999, ?array $replace = null, ?Throwable $throwable = null)
     {
         $message = self::ERROR_MSG[$code];
+
         if ($replace) {
             foreach ($replace as $key => $value) {
-                $message = \str_replace($key, $value, $message);
+                $message = str_replace($key, (string) $value, $message);
             }
         }
 

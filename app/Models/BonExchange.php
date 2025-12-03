@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,9 +16,9 @@
 
 namespace App\Models;
 
-use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use AllowDynamicProperties;
 
 /**
  * App\Models\BonExchange.
@@ -28,110 +31,39 @@ use Illuminate\Database\Eloquent\Model;
  * @property bool        $download
  * @property bool        $personal_freeleech
  * @property bool        $invite
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonExchange newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonExchange newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonExchange query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonExchange whereCost($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonExchange whereDescription($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonExchange whereDownload($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonExchange whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonExchange whereInvite($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonExchange wherePersonalFreeleech($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonExchange whereUpload($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\BonExchange whereValue($value)
- * @mixin \Eloquent
  */
-class BonExchange extends Model
+#[AllowDynamicProperties]
+final class BonExchange extends Model
 {
+    /** @use HasFactory<\Database\Factories\BonExchangeFactory> */
     use HasFactory;
-    use Auditable;
 
     /**
-     * The Database Table Used By The Model.
-     *
-     * @var string
-     */
-    protected $table = 'bon_exchange';
-
-    /**
-     * Indicates If The Model Should Be Timestamped.
+     * Indicates if the model should be timestamped.
      *
      * @var bool
      */
     public $timestamps = false;
 
     /**
-     * The Attributes That Should Be Casted To Native Types.
+     * Get the attributes that should be cast.
      *
-     * @var array
+     * @return array{upload: 'bool', download: 'bool', personal_freeleech: 'bool', invite: 'bool'}
      */
-    protected $casts = [
-        'upload'             => 'boolean',
-        'download'           => 'boolean',
-        'personal_freeleech' => 'boolean',
-        'invite'             => 'boolean',
-    ];
-
-    /**
-     * @method getDownloadOptions
-     *
-     * @return array
-     */
-    public function getDownloadOptions()
+    protected function casts(): array
     {
-        return self::where('download', '=', true)
-            ->orderBy('value', 'asc')
-            ->get();
+        return [
+            'upload'             => 'bool',
+            'download'           => 'bool',
+            'personal_freeleech' => 'bool',
+            'invite'             => 'bool',
+        ];
     }
 
     /**
-     * @method getUploadOptions
+     * The attributes that aren't mass assignable.
      *
-     * @return array
+     * @var string[]
      */
-    public function getUploadOptions()
-    {
-        return self::where('upload', '=', true)
-            ->orderBy('value', 'asc')
-            ->get();
-    }
-
-    /**
-     * @method getPersonalFreeleechOption
-     *
-     * @return array
-     */
-    public function getPersonalFreeleechOption()
-    {
-        return self::where('personal_freeleech', '=', true)
-            ->orderBy('value', 'asc')
-            ->get();
-    }
-
-    /**
-     * @method getInviteOption
-     *
-     * @return array
-     */
-    public function getInviteOption()
-    {
-        return self::where('invite', '=', true)
-            ->orderBy('value', 'asc')
-            ->get();
-    }
-
-    /**
-     * @method getItemCost
-     *
-     * @param $id
-     *
-     * @return int
-     */
-    public function getItemCost($id)
-    {
-        return self::where('id', '=', $id)
-            ->get()
-            ->toArray()[0]['cost'];
-    }
+    protected $guarded = ['id'];
 }

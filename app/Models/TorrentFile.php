@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,6 +19,8 @@ namespace App\Models;
 use App\Helpers\StringHelper;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\TorrentFile.
@@ -24,54 +29,40 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $name
  * @property int    $size
  * @property int    $torrent_id
- * @property-read \App\Models\Torrent $torrent
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentFile newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentFile newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentFile query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentFile whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentFile whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentFile whereSize($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\TorrentFile whereTorrentId($value)
- * @mixin \Eloquent
  */
-class TorrentFile extends Model
+#[AllowDynamicProperties]
+final class TorrentFile extends Model
 {
+    /** @use HasFactory<\Database\Factories\TorrentFileFactory> */
     use HasFactory;
 
     /**
-     * Indicates If The Model Should Be Timestamped.
+     * Indicates if the model should be timestamped.
      *
      * @var bool
      */
     public $timestamps = false;
 
     /**
-     * The Database Table Used By The Model.
-     *
+     * The table associated with the model.
      * @var string
      */
     protected $table = 'files';
 
     /**
-     * Belongs To A Torrent.
+     * The torrent that owns the file.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Torrent, $this>
      */
-    public function torrent()
+    public function torrent(): BelongsTo
     {
         return $this->belongsTo(Torrent::class);
     }
 
     /**
-     * Return Size In Human Format.
-     *
-     * @param null $bytes
-     * @param int  $precision
-     *
-     * @return string
+     * Get size in human format.
      */
-    public function getSize($bytes = null, $precision = 2)
+    public function getSize(): string
     {
         $bytes = $this->size;
 

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -15,6 +18,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\UserEcho.
@@ -26,77 +31,56 @@ use Illuminate\Database\Eloquent\Model;
  * @property int|null                        $bot_id
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\Bot|null $bot
- * @property-read \App\Models\Chatroom|null $room
- * @property-read \App\Models\User|null $target
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\UserEcho newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\UserEcho newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\UserEcho query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\UserEcho whereBotId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\UserEcho whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\UserEcho whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\UserEcho whereRoomId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\UserEcho whereTargetId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\UserEcho whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\UserEcho whereUserId($value)
- * @mixin \Eloquent
  */
-class UserEcho extends Model
+#[AllowDynamicProperties]
+final class UserEcho extends Model
 {
+    /** @use HasFactory<\Database\Factories\UserEchoFactory> */
     use HasFactory;
 
     /**
-     * Indicates If The Model Should Be Timestamped.
+     * The attributes that aren't mass assignable.
      *
-     * @var bool
+     * @var string[]
      */
-    public $timestamps = true;
+    protected $guarded = [];
 
     /**
-     * The Database Table Used By The Model.
+     * Get the user that owns the echo.
      *
-     * @var string
+     * @return BelongsTo<User, $this>
      */
-    protected $table = 'user_echoes';
-
-    /**
-     * Belongs To A User.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
     /**
-     * Belongs To A Chatroom.
+     * Get the chatroom associated with the echo.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Chatroom, $this>
      */
-    public function room()
+    public function room(): BelongsTo
     {
         return $this->belongsTo(Chatroom::class);
     }
 
     /**
-     * Belongs To A Target.
+     * Get the target user associated with the echo.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function target()
+    public function target(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
     /**
-     * Belongs To A Bot.
+     * Get the bot that associated with the echo.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Bot, $this>
      */
-    public function bot()
+    public function bot(): BelongsTo
     {
         return $this->belongsTo(Bot::class);
     }

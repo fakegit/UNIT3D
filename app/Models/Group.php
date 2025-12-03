@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,125 +19,142 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Group.
  *
- * @property int    $id
- * @property string $name
- * @property string $slug
- * @property int    $position
- * @property int    $level
- * @property string $color
- * @property string $icon
- * @property string $effect
- * @property int    $is_internal
- * @property int    $is_owner
- * @property int    $is_admin
- * @property int    $is_modo
- * @property int    $is_trusted
- * @property int    $is_immune
- * @property int    $is_freeleech
- * @property int    $is_double_upload
- * @property int    $can_upload
- * @property int    $is_incognito
- * @property int    $autogroup
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Permission[] $permissions
- * @property-read int|null $permissions_count
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\User[] $users
- * @property-read int|null $users_count
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereAutogroup($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereCanUpload($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereColor($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereEffect($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereIcon($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereIsAdmin($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereIsDoubleUpload($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereIsFreeleech($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereIsImmune($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereIsIncognito($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereIsInternal($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereIsModo($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereIsOwner($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereIsTrusted($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereLevel($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group wherePosition($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Group whereSlug($value)
- * @mixin \Eloquent
+ * @property int         $id
+ * @property string      $name
+ * @property string      $slug
+ * @property int         $position
+ * @property int         $level
+ * @property int|null    $download_slots
+ * @property string      $description
+ * @property string      $color
+ * @property string      $icon
+ * @property string      $effect
+ * @property bool        $is_uploader
+ * @property bool        $is_internal
+ * @property bool        $is_editor
+ * @property bool        $is_torrent_modo
+ * @property bool        $is_owner
+ * @property bool        $is_admin
+ * @property bool        $is_modo
+ * @property bool        $is_trusted
+ * @property bool        $is_immune
+ * @property bool        $is_freeleech
+ * @property bool        $is_double_upload
+ * @property bool        $is_refundable
+ * @property bool        $can_chat
+ * @property bool        $can_comment
+ * @property bool        $can_invite
+ * @property bool        $can_request
+ * @property bool        $can_upload
+ * @property bool        $is_incognito
+ * @property bool        $autogroup
+ * @property bool        $system_required
+ * @property int|null    $min_uploaded
+ * @property int|null    $min_seedsize
+ * @property int|null    $min_avg_seedtime
+ * @property string|null $min_ratio
+ * @property int|null    $min_age
+ * @property int|null    $min_uploads
  */
-class Group extends Model
+#[AllowDynamicProperties]
+final class Group extends Model
 {
-    use HasFactory;
     use Auditable;
 
-    /**
-     * The Attributes That Aren't Mass Assignable.
-     *
-     * @var array
-     */
-    protected $guarded = ['id'];
+    /** @use HasFactory<\Database\Factories\GroupFactory> */
+    use HasFactory;
 
     /**
-     * Indicates If The Model Should Be Timestamped.
+     * Get the attributes that should be cast.
+     *
+     * @return array{
+     *     is_uploader: 'bool',
+     *     is_internal: 'bool',
+     *     is_editor: 'bool',
+     *     is_torrent_modo: 'bool',
+     *     is_owner: 'bool',
+     *     is_admin: 'bool',
+     *     is_modo: 'bool',
+     *     is_trusted: 'bool',
+     *     is_immune: 'bool',
+     *     is_freeleech: 'bool',
+     *     is_double_upload: 'bool',
+     *     is_refundable: 'bool',
+     *     can_chat: 'bool',
+     *     can_comment: 'bool',
+     *     can_invite: 'bool',
+     *     can_request: 'bool',
+     *     can_upload: 'bool',
+     *     is_incognito: 'bool',
+     *     autogroup: 'bool',
+     *     system_required: 'bool',
+     *     min_ratio: 'decimal:2',
+     * }
+     */
+    protected function casts(): array
+    {
+        return [
+            'is_uploader'      => 'bool',
+            'is_internal'      => 'bool',
+            'is_editor'        => 'bool',
+            'is_torrent_modo'  => 'bool',
+            'is_owner'         => 'bool',
+            'is_admin'         => 'bool',
+            'is_modo'          => 'bool',
+            'is_trusted'       => 'bool',
+            'is_immune'        => 'bool',
+            'is_freeleech'     => 'bool',
+            'is_double_upload' => 'bool',
+            'is_refundable'    => 'bool',
+            'can_chat'         => 'bool',
+            'can_comment'      => 'bool',
+            'can_invite'       => 'bool',
+            'can_request'      => 'bool',
+            'can_upload'       => 'bool',
+            'is_incognito'     => 'bool',
+            'autogroup'        => 'bool',
+            'system_required'  => 'bool',
+            'min_ratio'        => 'decimal:2',
+        ];
+    }
+
+    /**
+     * The attributes that aren't mass assignable.
+     *
+     * @var string[]
+     */
+    protected $guarded = ['id', 'created_at', 'updated_at'];
+
+    /**
+     * Indicates if the model should be timestamped.
      *
      * @var bool
      */
     public $timestamps = false;
 
     /**
-     * Has Many Users.
+     * Get the users for the group.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<User, $this>
      */
-    public function users()
+    public function users(): HasMany
     {
         return $this->hasMany(User::class);
     }
 
     /**
-     * Has Many Permissions.
+     * Get the forum permissions for the group.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<ForumPermission, $this>
      */
-    public function permissions()
+    public function permissions(): HasMany
     {
-        return $this->hasMany(Permission::class);
-    }
-
-    /**
-     * Returns The Requested Row From The Permissions Table.
-     *
-     * @param $forum
-     *
-     * @return \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Eloquent\Model|object|null
-     */
-    public function getPermissionsByForum($forum)
-    {
-        return Permission::where('forum_id', '=', $forum->id)
-            ->where('group_id', '=', $this->id)
-            ->first();
-    }
-
-    /**
-     * Get the Group allowed answer as bool.
-     *
-     * @param $object
-     * @param $groupId
-     *
-     * @return int
-     */
-    public function isAllowed($object, $groupId)
-    {
-        if (\is_array($object) && \is_array($object['default_groups']) && \array_key_exists($groupId, $object['default_groups'])) {
-            return $object['default_groups'][$groupId] == 1;
-        }
-
-        return true;
+        return $this->hasMany(ForumPermission::class);
     }
 }

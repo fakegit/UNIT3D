@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,32 +17,35 @@
 namespace App\Http\Livewire;
 
 use App\Models\Watchlist;
+use App\Traits\LivewireSort;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class WatchlistSearch extends Component
 {
+    use LivewireSort;
     use WithPagination;
 
-    public $user;
-    public $perPage = 25;
-    public $search = '';
-    public $sortField = 'created_at';
-    public $sortDirection = 'desc';
+    public ?\Illuminate\Contracts\Auth\Authenticatable $user = null;
+
+    #TODO: Update URL attributes once Livewire 3 fixes upstream bug. See: https://github.com/livewire/livewire/discussions/7746
+
+    #[Url(history: true)]
+    public int $perPage = 25;
+
+    #[Url(history: true)]
+    public string $search = '';
+
+    #[Url(history: true)]
+    public string $sortField = 'created_at';
+
+    #[Url(history: true)]
+    public string $sortDirection = 'desc';
 
     final public function mount(): void
     {
-        $this->user = \auth()->user();
-    }
-
-    final public function paginationView(): string
-    {
-        return 'vendor.pagination.livewire-pagination';
-    }
-
-    final public function updatedPage(): void
-    {
-        $this->emit('paginationChanged');
+        $this->user = auth()->user();
     }
 
     final public function updatingSearch(): void
@@ -47,28 +53,20 @@ class WatchlistSearch extends Component
         $this->resetPage();
     }
 
-    final public function getUsersProperty(): \Illuminate\Contracts\Pagination\LengthAwarePaginator
-    {
-        return Watchlist::query()
-            ->with(['user', 'author'])
+    /**
+     * @var \Illuminate\Pagination\LengthAwarePaginator<int, Watchlist>
+     */
+    final protected \Illuminate\Pagination\LengthAwarePaginator $users {
+        get => Watchlist::query()
+            ->with(['user.group', 'author.group'])
             ->when($this->search, fn ($query) => $query->where('message', 'LIKE', '%'.$this->search.'%'))
             ->orderBy($this->sortField, $this->sortDirection)
             ->paginate($this->perPage);
     }
 
-    final public function sortBy($field): void
-    {
-        if ($this->sortField === $field) {
-            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            $this->sortDirection = 'asc';
-        }
-        $this->sortField = $field;
-    }
-
     final public function render(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Contracts\Foundation\Application
     {
-        return \view('livewire.watchlist-search', [
+        return view('livewire.watchlist-search', [
             'watchedUsers' => $this->users,
         ]);
     }

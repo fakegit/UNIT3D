@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,8 +17,10 @@
 namespace App\Console\Commands;
 
 use App\Bots\IRCAnnounceBot;
+use Exception;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Input\InputArgument;
+use Throwable;
 
 class IrcMessage extends Command
 {
@@ -36,21 +41,23 @@ class IrcMessage extends Command
     /**
      * Execute the console command.
      *
-     * @return mixed
+     * @throws Exception|Throwable If there is an error during the execution of the command.
      */
-    public function handle()
+    final public function handle(): void
     {
         $this->info('Messaging '.$this->argument('channel').': '.$this->argument('message'));
-        $ircAnnounceBot = new IRCAnnounceBot();
-        $ircAnnounceBot->message($this->argument('channel'), $this->argument('message'));
+
+        (new IRCAnnounceBot())
+            ->to($this->argument('channel'))
+            ->say($this->argument('message'));
     }
 
     /**
      * Get the console command arguments.
      *
-     * @return array
+     * @return array<int, array<int, int|string>>
      */
-    protected function getArguments()
+    protected function getArguments(): array
     {
         return [
             ['channel', InputArgument::REQUIRED, 'Channel that you would like to message'],

@@ -1,66 +1,92 @@
-@extends('layout.default')
+@extends('layout.with-main')
 
 @section('title')
-    <title>@lang('stat.stats') - {{ config('other.title') }}</title>
+    <title>{{ __('stat.stats') }} - {{ config('other.title') }}</title>
 @endsection
 
-@section('breadcrumb')
-    <li class="active">
-        <a href="{{ route('stats') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('stat.stats')</span>
+@section('breadcrumbs')
+    <li class="breadcrumbV2">
+        <a href="{{ route('stats') }}" class="breadcrumb__link">
+            {{ __('stat.stats') }}
         </a>
     </li>
-    <li>
-        <a href="{{ route('dying') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('stat.top-dying')</span>
-        </a>
+    <li class="breadcrumb--active">
+        {{ __('torrent.torrents') }}
     </li>
 @endsection
 
-@section('content')
-    <div class="container">
-        @include('partials.statstorrentmenu')
-    
-        <div class="block">
-            <h2>@lang('stat.top-dying')</h2>
-            <hr>
-            <div class="row">
-                <div class="col-md-12">
-                    <p class="text-orange"><strong><i
-                                class="{{ config('other.font-awesome') }} fa-exclamation-triangle"></i>
-                            @lang('stat.top-dying')</strong></p>
-                    <table class="table table-condensed table-striped table-bordered">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>@lang('torrent.torrent')</th>
-                                <th>@lang('torrent.seeders')</th>
-                                <th>@lang('torrent.leechers')</th>
-                                <th>@lang('torrent.completed')</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($dying as $key => $d)
-                                <tr>
-                                    <td>
-                                        {{ ++$key }}
-                                    </td>
-                                    <td>
-                                        <a class="text-bold" href="{{ route('torrent', ['id' => $d->id]) }}">
-                                            {{ $d->name }}
-                                        </a>
-                                    </td>
-                                    <td>{{ $d->seeders }}</td>
-                                    <td>{{ $d->leechers }}</td>
-                                    <td>
-                                        <span>{{ $d->times_completed }}</span>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+@section('nav-tabs')
+    @include('partials.statstorrentmenu')
+@endsection
+
+@section('page', 'page__stats--dying')
+
+@section('main')
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ __('stat.top-dying') }}</h2>
+        <div class="data-table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>{{ __('torrent.torrent') }}</th>
+                        <th
+                            title="{{ __('torrent.seeders') }}"
+                            style="text-align: right; min-width: 40px"
+                        >
+                            <i class="fas fa-arrow-alt-circle-up"></i>
+                        </th>
+                        <th
+                            title="{{ __('torrent.leechers') }}"
+                            style="text-align: right; min-width: 40px"
+                        >
+                            <i class="fas fa-arrow-alt-circle-down"></i>
+                        </th>
+                        <th
+                            title="{{ __('torrent.completed') }}"
+                            style="text-align: right; min-width: 40px"
+                        >
+                            <i class="fas fa-check-circle"></i>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($dying as $torrent)
+                        <tr>
+                            <td>{{ $loop->iteration }}</td>
+                            <td>
+                                <a href="{{ route('torrents.show', ['id' => $torrent->id]) }}">
+                                    {{ $torrent->name }}
+                                </a>
+                            </td>
+                            <td style="text-align: right">
+                                <a
+                                    class="torrent__seeder-count"
+                                    href="{{ route('peers', ['id' => $torrent->id]) }}"
+                                >
+                                    {{ $torrent->seeders }}
+                                </a>
+                            </td>
+                            <td style="text-align: right">
+                                <a
+                                    class="torrent__leecher-count"
+                                    href="{{ route('peers', ['id' => $torrent->id]) }}"
+                                >
+                                    {{ $torrent->leechers }}
+                                </a>
+                            </td>
+                            <td style="text-align: right">
+                                <a
+                                    class="torrent__times-completed-count"
+                                    href="{{ route('history', ['id' => $torrent->id]) }}"
+                                >
+                                    {{ $torrent->times_completed }}
+                                </a>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
         </div>
-    </div>
+    </section>
 @endsection

@@ -1,6 +1,8 @@
 <?php
 
-require_once __DIR__.'/vendor/autoload.php';
+declare(strict_types=1);
+
+opcache_compile_file(__DIR__.'/vendor/autoload.php');
 
 class Preloader
 {
@@ -66,7 +68,7 @@ class Preloader
         $handle = opendir($path);
 
         while ($file = readdir($handle)) {
-            if (in_array($file, ['.', '..'])) {
+            if (\in_array($file, ['.', '..'])) {
                 continue;
             }
 
@@ -84,7 +86,7 @@ class Preloader
             return;
         }
 
-        require_once $path;
+        opcache_compile_file($path);
 
         self::$count++;
 
@@ -98,7 +100,7 @@ class Preloader
         }
 
         foreach ($this->ignores as $ignore) {
-            if (strpos($name, $ignore) === 0) {
+            if (str_starts_with($name, $ignore)) {
                 return true;
             }
         }
@@ -108,12 +110,9 @@ class Preloader
 }
 
 (new Preloader())
-    ->paths(__DIR__.'/vendor/laravel')
-    ->ignore(
-        \Illuminate\Filesystem\Cache::class,
-        \Illuminate\Log\LogManager::class,
-        \Illuminate\Http\Testing\File::class,
-        \Illuminate\Http\UploadedFile::class,
-        \Illuminate\Support\Carbon::class,
-        )
+    ->paths(
+        __DIR__.'/app/Http/Controllers/AnnounceController.php',
+        __DIR__.'/app/Http/Controllers/RssController.php',
+        __DIR__.'/app/Http/Controllers/API/TorrentController.php',
+    )
     ->load();

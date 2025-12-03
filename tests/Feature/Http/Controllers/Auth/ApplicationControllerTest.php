@@ -1,36 +1,56 @@
 <?php
 
-namespace Tests\Feature\Http\Controllers\Auth;
-
-use App\Models\Application;
-use Tests\TestCase;
+declare(strict_types=1);
 
 /**
- * @see \App\Http\Controllers\Auth\ApplicationController
+ * NOTICE OF LICENSE.
+ *
+ * UNIT3D Community Edition is open-sourced software licensed under the GNU Affero General Public License v3.0
+ * The details is bundled with this project in the file LICENSE.txt.
+ *
+ * @project    UNIT3D Community Edition
+ *
+ * @author     HDVinnie <hdinnovations@protonmail.com>
+ * @license    https://www.gnu.org/licenses/agpl-3.0.en.html/ GNU Affero General Public License v3.0
  */
-class ApplicationControllerTest extends TestCase
-{
-    /**
-     * @test
-     */
-    public function create_returns_an_ok_response()
-    {
-        $this->get(route('application.create'))
-            ->assertOk()
-            ->assertViewIs('auth.application.create');
-    }
 
-    /**
-     * @test
-     */
-    public function store_returns_an_ok_response()
-    {
-        config(['captcha.enabled' => false]);
+use App\Models\Application;
 
-        $application = Application::factory()->make();
+test('create returns an ok response', function (): void {
+    $response = $this->get(route('application.create'));
+    $response->assertOk();
+    $response->assertViewIs('auth.application.create');
+});
 
-        $this->post(route('application.store'), $application->toArray())
-            ->assertRedirect(route('login'))
-            ->assertSessionHas('success', trans('auth.application-submitted'));
-    }
-}
+test('store returns an ok response', function (): void {
+    config(['captcha.enabled' => false]);
+    config(['other.application_signups' => true]);
+
+    $application = Application::factory()->make();
+
+    $response = $this->post(route('application.store'), [
+        'application' => [
+            'type'     => $application->type,
+            'email'    => $application->email,
+            'referrer' => $application->referrer,
+        ],
+        'images' => [
+            [
+                'image' => 'https://example.org/1',
+            ],
+            [
+                'image' => 'https://example.org/2',
+            ],
+        ],
+        'links' => [
+            [
+                'url' => 'https://example.org/1',
+            ],
+            [
+                'url' => 'https://example.org/2',
+            ],
+        ]
+    ]);
+    $response->assertRedirect(route('login'));
+    $response->assertSessionHas('success', trans('auth.application-submitted'));
+});

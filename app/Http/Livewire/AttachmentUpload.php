@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,7 +16,10 @@
 
 namespace App\Http\Livewire;
 
+use App\Models\Ticket;
 use App\Models\TicketAttachment;
+use App\Models\User;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -21,40 +27,59 @@ class AttachmentUpload extends Component
 {
     use WithFileUploads;
 
-    public $user;
-    public $ticket;
+    public ?User $user = null;
+
+    public ?int $ticket = null;
+
+    #[Validate('image|max:1024')]
     public $attachment;
+
     public $storedImage;
 
     final public function mount(int $id): void
     {
-        $this->user = \auth()->user();
+        $this->user = auth()->user();
         $this->ticket = $id;
     }
 
-    final public function upload(): void
+    final public function updatedAttachment(): void
     {
-        $this->validate([
-            'attachment' => 'image|max:1024', // 1MB Max
-        ]);
+        $this->validate();
 
-        $fileName = \uniqid('', true).'.'.$this->attachment->getClientOriginalExtension();
+        $ticket = Ticket::find($this->ticket);
 
-        $this->attachment->storeAs('attachments', $fileName, 'attachments');
+        abort_unless($ticket->user_id === $this->user->id || $this->user->group->is_modo, 403);
+
+        $fileName = uniqid('', true).'.'.$this->attachment->getClientOriginalExtension();
+
+        $this->attachment->storeAs('', $fileName, 'attachment-files');
 
         $attachment = new TicketAttachment();
         $attachment->user_id = $this->user->id;
-        $attachment->ticket_id = $this->ticket;
+        $attachment->ticket_id = $ticket->id;
         $attachment->file_name = $fileName;
         $attachment->file_size = $this->attachment->getSize();
         $attachment->file_extension = $this->attachment->getMimeType();
         $attachment->save();
 
-        $this->dispatchBrowserEvent('success', ['type' => 'success',  'message' => 'Ticket Attachment Uploaded Successfully!']);
+        $this->dispatch('success', type: 'success', message: 'Ticket attachment uploaded successfully!');
+    }
+
+    /**
+     * @var \Illuminate\Database\Eloquent\Collection<int, TicketAttachment>
+     */
+    protected \Illuminate\Database\Eloquent\Collection $attachments {
+        get {
+            $ticket = Ticket::find($this->ticket);
+
+            abort_unless($ticket->user_id === $this->user->id || $this->user->group->is_modo, 403);
+
+            return $ticket->attachments;
+        }
     }
 
     final public function render(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Contracts\Foundation\Application
     {
-        return \view('livewire.attachment-upload');
+        return view('livewire.attachment-upload', ['attachments' => $this->attachments]);
     }
 }

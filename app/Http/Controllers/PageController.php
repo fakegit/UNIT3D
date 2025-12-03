@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,8 +16,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BlacklistClient;
+use App\Models\Group;
+use App\Models\Internal;
 use App\Models\Page;
-use Illuminate\Support\Facades\DB;
 
 /**
  * @see \Tests\Todo\Feature\Http\Controllers\PageControllerTest
@@ -26,21 +31,19 @@ class PageController extends Controller
      */
     public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $pages = Page::all();
-
-        return \view('page.index', ['pages' => $pages]);
+        return view('page.index', [
+            'pages' => Page::all(),
+        ]);
     }
 
     /**
      * Show A Page.
-     *
-     * @param \App\Models\Page $id
      */
-    public function show($id): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    public function show(Page $page): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $page = Page::findOrFail($id);
-
-        return \view('page.page', ['page' => $page]);
+        return view('page.page', [
+            'page' => $page,
+        ]);
     }
 
     /**
@@ -48,9 +51,13 @@ class PageController extends Controller
      */
     public function staff(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $staff = DB::table('users')->leftJoin('groups', 'users.group_id', '=', 'groups.id')->select(['users.id', 'users.title', 'users.username', 'groups.name', 'groups.color', 'groups.icon'])->where('groups.is_admin', 1)->orWhere('groups.is_modo', 1)->get();
-
-        return \view('page.staff', ['staff' => $staff]);
+        return view('page.staff', [
+            'staff' => Group::query()
+                ->with('users.group')
+                ->where('is_torrent_modo', '=', 1)
+                ->orderByDesc('position')
+                ->get(),
+        ]);
     }
 
     /**
@@ -58,20 +65,24 @@ class PageController extends Controller
      */
     public function internal(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $internal_group = DB::table('internals')->get();
-        $internal_user = DB::table('users')->leftJoin('groups', 'users.group_id', '=', 'groups.id')->select(['users.id', 'users.title', 'users.username', 'groups.name', 'groups.color', 'groups.icon', 'users.internal_id'])->where('groups.is_internal', 1)->get();
-
-        return \view('page.internal', ['internal_user' => $internal_user, 'internal_group' => $internal_group]);
+        return view('page.internal', [
+            'internals' => Internal::query()
+                ->with([
+                    'users' => fn ($query) => $query->with('group')->orderByPivot('position', 'asc'),
+                ])
+                ->orderBy('name')
+                ->get(),
+        ]);
     }
 
     /**
-     * Show Blacklist Page.
+     * Show Client-Blacklist Page.
      */
-    public function blacklist(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    public function clientblacklist(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $clients = \config('client-blacklist.clients', []);
-
-        return \view('page.blacklist', ['clients' => $clients]);
+        return view('page.blacklist.client', [
+            'clients' => BlacklistClient::all(),
+        ]);
     }
 
     /**
@@ -79,6 +90,6 @@ class PageController extends Controller
      */
     public function about(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        return \view('page.aboutus');
+        return view('page.aboutus');
     }
 }

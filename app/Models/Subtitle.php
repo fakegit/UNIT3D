@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,9 +16,14 @@
 
 namespace App\Models;
 
+use App\Enums\ModerationStatus;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Helpers\StringHelper;
+use App\Models\Scopes\ApprovedScope;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Subtitle.
@@ -31,84 +39,79 @@ use Illuminate\Database\Eloquent\Model;
  * @property int                             $verified
  * @property int                             $user_id
  * @property int                             $torrent_id
- * @property int                             $anon
- * @property int                             $status
- * @property string|null                     $moderated_at
+ * @property bool                            $anon
+ * @property ModerationStatus                $status
+ * @property \Illuminate\Support\Carbon|null $moderated_at
  * @property int|null                        $moderated_by
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\MediaLanguage $language
- * @property-read \App\Models\Torrent $torrent
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereAnon($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereDownloads($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereExtension($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereFileName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereFileSize($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereLanguageId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereModeratedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereModeratedBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereNote($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereStatus($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereTitle($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereTorrentId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereUserId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Subtitle whereVerified($value)
- * @mixin \Eloquent
  */
-class Subtitle extends Model
+#[AllowDynamicProperties]
+final class Subtitle extends Model
 {
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\SubtitleFactory> */
+    use HasFactory;
+
+    protected $guarded = [];
+
     /**
-     * Belongs To A User.
+     * Get the attributes that should be cast.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return array{anon: 'bool', status: class-string<ModerationStatus>, moderated_at: 'datetime'}
      */
-    public function user()
+    protected function casts(): array
+    {
+        return [
+            'anon'         => 'bool',
+            'status'       => ModerationStatus::class,
+            'moderated_at' => 'datetime',
+        ];
+    }
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new ApprovedScope());
+    }
+
+    /**
+     * Get the user that uploaded the subtitle.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A Torrent.
+     * Get the torrent associated with the subtitle.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Torrent, $this>
      */
-    public function torrent()
+    public function torrent(): BelongsTo
     {
         return $this->belongsTo(Torrent::class);
     }
 
     /**
-     * Belongs To A Media Language.
+     * Get the language associated with the subtitle.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<MediaLanguage, $this>
      */
-    public function language()
+    public function language(): BelongsTo
     {
         return $this->belongsTo(MediaLanguage::class);
     }
 
     /**
-     * Returns The Size In Human Format.
-     *
-     * @param null $bytes
-     * @param int  $precision
-     *
-     * @return string
+     * Gets the size in human format.
      */
-    public function getSize($bytes = null, $precision = 2)
+    public function getSize(): string
     {
         $bytes = $this->file_size;
 

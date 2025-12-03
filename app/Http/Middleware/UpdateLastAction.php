@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,24 +17,20 @@
 namespace App\Http\Middleware;
 
 use Closure;
+use Illuminate\Support\Facades\Redis;
 
 class UpdateLastAction
 {
     /**
      * Handle an incoming request.
-     *
-     * @param \Illuminate\Http\Request $request
-     *
-     * @return mixed
      */
-    public function handle($request, Closure $next)
+    public function handle(\Illuminate\Http\Request $request, Closure $next): mixed
     {
-        if (! $user = $request->user()) {
-            return $next($request);
-        }
+        $user = $request->user();
 
-        $user->last_action = \now();
-        $user->save();
+        if ($user !== null) {
+            Redis::command('LPUSH', [config('cache.prefix').':user-last-actions:batch', $user->id]);
+        }
 
         return $next($request);
     }

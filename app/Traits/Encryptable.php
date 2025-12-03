@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -22,7 +25,13 @@ trait Encryptable
         $value = parent::getAttribute($key);
 
         if (\in_array($key, $this->encryptable, true)) {
-            return Crypt::decrypt($value);
+            try {
+                $decryptedValue = Crypt::decrypt($value);
+            } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+                $decryptedValue = 'The value could not be decrypted.';
+            }
+
+            return $decryptedValue;
         }
 
         return $value;

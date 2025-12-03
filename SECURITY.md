@@ -4,7 +4,11 @@
 
  Version     | Status                   | PHP Version Required
 :------------|:-------------------------|:------------
- 5.x.x       |  Active Support :rocket: | >= 8.0
+ 9.x.x       |  Active Support :rocket: | >= 8.4
+ 8.x.x       |  End Of Life :skull: | >= 8.3
+ 7.x.x       |  End Of Life :skull: | >= 8.2
+ 6.x.x       |  End Of Life :skull: | >= 8.1
+ 5.x.x       |  End Of Life :skull: | >= 8.0
  4.x.x       |  End Of Life :skull: | >= 7.4
  3.x.x       |  End Of Life :skull: | >= 7.4
  2.3.0 to 2.7.0|  End Of Life :skull: | >= 7.4
@@ -13,4 +17,6 @@
 
 ## Reporting a Vulnerability
 
-If you discover any security related issues, please email hdinnovations@protonmail.com instead of using the issue tracker.
+Please email us at hdinnovations@protonmail.com
+
+Thank you for improving the security of unit3d.

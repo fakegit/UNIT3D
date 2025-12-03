@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,11 +17,13 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Staff\StoreForumRequest;
+use App\Http\Requests\Staff\UpdateForumRequest;
 use App\Models\Forum;
+use App\Models\ForumCategory;
 use App\Models\Group;
-use App\Models\Permission;
+use Exception;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 /**
  * @see \Tests\Todo\Feature\Http\Controllers\Staff\ForumControllerTest
@@ -26,190 +31,65 @@ use Illuminate\Support\Str;
 class ForumController extends Controller
 {
     /**
-     * Display All Forums.
-     */
-    public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
-    {
-        $categories = Forum::where('parent_id', '=', 0)->get()->sortBy('position');
-
-        return \view('Staff.forum.index', ['categories' => $categories]);
-    }
-
-    /**
      * Show Forum Create Form.
      */
-    public function create(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    public function create(Request $request): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $categories = Forum::where('parent_id', '=', 0)->get();
-        $groups = Group::all();
-
-        return \view('Staff.forum.create', ['categories' => $categories, 'groups' => $groups]);
+        return view('Staff.forum.create', [
+            'forumCategoryId' => $request->integer('forumCategoryId'),
+            'categories'      => ForumCategory::orderBy('position')->get(),
+            'groups'          => Group::orderBy('position')->get(),
+        ]);
     }
 
     /**
      * Store A New Forum.
-     *
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function store(Request $request)
+    public function store(StoreForumRequest $request): \Illuminate\Http\RedirectResponse
     {
-        $groups = Group::all();
+        $forum = Forum::create($request->validated('forum'));
 
-        $forum = new Forum();
-        $forum->name = $request->input('title');
-        $forum->position = $request->input('position');
-        $forum->slug = Str::slug($request->input('title'));
-        $forum->description = $request->input('description');
-        $forum->parent_id = $request->input('parent_id');
-        $forum->save();
+        $forum->permissions()->upsert($request->validated('permissions'), ['forum_id', 'group_id']);
 
-        // Permissions
-        foreach ($groups as $k => $group) {
-            $perm = Permission::whereRaw('forum_id = ? AND group_id = ?', [$forum->id, $group->id])->first();
-            if ($perm == null) {
-                $perm = new Permission();
-            }
-            $perm->forum_id = $forum->id;
-            $perm->group_id = $group->id;
-            if (\array_key_exists($group->id, $request->input('permissions'))) {
-                $perm->show_forum = isset($request->input('permissions')[$group->id]['show_forum']);
-                $perm->read_topic = isset($request->input('permissions')[$group->id]['read_topic']);
-                $perm->reply_topic = isset($request->input('permissions')[$group->id]['reply_topic']);
-                $perm->start_topic = isset($request->input('permissions')[$group->id]['start_topic']);
-            } else {
-                $perm->show_forum = false;
-                $perm->read_topic = false;
-                $perm->reply_topic = false;
-                $perm->start_topic = false;
-            }
-            $perm->save();
-        }
-
-        return \redirect()->route('staff.forums.index')
-            ->withSuccess('Forum has been created successfully');
+        return to_route('staff.forum_categories.index')
+            ->with('success', 'Forum has been created successfully');
     }
 
     /**
      * Forum Edit Form.
-     *
-     * @param \App\Models\Forum $id
      */
-    public function edit($id): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    public function edit(Forum $forum): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $forum = Forum::findOrFail($id);
-        $categories = Forum::where('parent_id', '=', 0)->get();
-        $groups = Group::all();
-
-        return \view('Staff.forum.edit', [
-            'categories' => $categories,
-            'groups'     => $groups,
-            'forum'      => $forum,
+        return view('Staff.forum.edit', [
+            'categories' => ForumCategory::orderBy('position')->get(),
+            'groups'     => Group::orderBy('position')->get(),
+            'forum'      => $forum->load(['permissions', 'category']),
         ]);
     }
 
     /**
      * Edit A Forum.
-     *
-     * @param \App\Models\Forum $id
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function update(Request $request, $id)
+    public function update(UpdateForumRequest $request, Forum $forum): \Illuminate\Http\RedirectResponse
     {
-        $forum = Forum::findOrFail($id);
-        $groups = Group::all();
+        $forum->update($request->validated('forum'));
 
-        $forum->name = $request->input('title');
-        $forum->position = $request->input('position');
-        $forum->slug = Str::slug($request->input('title'));
-        $forum->description = $request->input('description');
-        $forum->parent_id = $request->input('forum_type') == 'category' ? 0 : $request->input('parent_id');
-        $forum->save();
+        $forum->permissions()->upsert($request->validated('permissions'), ['forum_id', 'group_id']);
 
-        // Permissions
-        foreach ($groups as $k => $group) {
-            $perm = Permission::whereRaw('forum_id = ? AND group_id = ?', [$forum->id, $group->id])->first();
-            if ($perm == null) {
-                $perm = new Permission();
-            }
-            $perm->forum_id = $forum->id;
-            $perm->group_id = $group->id;
-            if (\array_key_exists($group->id, $request->input('permissions'))) {
-                $perm->show_forum = isset($request->input('permissions')[$group->id]['show_forum']);
-                $perm->read_topic = isset($request->input('permissions')[$group->id]['read_topic']);
-                $perm->reply_topic = isset($request->input('permissions')[$group->id]['reply_topic']);
-                $perm->start_topic = isset($request->input('permissions')[$group->id]['start_topic']);
-            } else {
-                $perm->show_forum = false;
-                $perm->read_topic = false;
-                $perm->reply_topic = false;
-                $perm->start_topic = false;
-            }
-            $perm->save();
-        }
-
-        return \redirect()->route('staff.forums.index')
-            ->withSuccess('Forum has been edited successfully');
+        return to_route('staff.forum_categories.index')
+            ->with('success', 'Forum has been edited successfully');
     }
 
     /**
      * Delete A Forum.
      *
-     * @param \App\Models\Forum $id
-     *
-     * @throws \Exception
-     *
-     * @return \Illuminate\Http\RedirectResponse
+     * @throws Exception
      */
-    public function destroy($id)
+    public function destroy(Forum $forum): \Illuminate\Http\RedirectResponse
     {
-        // Forum to delete
-        $forum = Forum::findOrFail($id);
+        $forum->delete();
 
-        $permissions = Permission::where('forum_id', '=', $forum->id)->get();
-        foreach ($permissions as $p) {
-            $p->delete();
-        }
-        unset($permissions);
-
-        if ($forum->parent_id == 0) {
-            $category = $forum;
-            $permissions = Permission::where('forum_id', '=', $category->id)->get();
-            foreach ($permissions as $p) {
-                $p->delete();
-            }
-
-            foreach ($category->getForumsInCategory() as $forum) {
-                $permissions = Permission::where('forum_id', '=', $forum->id)->get();
-                foreach ($permissions as $p) {
-                    $p->delete();
-                }
-
-                foreach ($forum->topics as $t) {
-                    foreach ($t->posts as $p) {
-                        $p->delete();
-                    }
-                    $t->delete();
-                }
-                $forum->delete();
-            }
-            $category->delete();
-        } else {
-            $permissions = Permission::where('forum_id', '=', $forum->id)->get();
-            foreach ($permissions as $p) {
-                $p->delete();
-            }
-            foreach ($forum->topics as $t) {
-                foreach ($t->posts as $p) {
-                    $p->delete();
-                }
-                $t->delete();
-            }
-            $forum->delete();
-        }
-
-        return \redirect()->route('staff.forums.index')
-            ->withSuccess('Forum has been deleted successfully');
+        return to_route('staff.forum_categories.index')
+            ->with('success', 'Forum has been deleted successfully');
     }
 }

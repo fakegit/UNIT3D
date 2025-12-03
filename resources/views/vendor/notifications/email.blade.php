@@ -3,56 +3,61 @@
 @if (! empty($greeting))
 # {{ $greeting }}
 @else
-@if ($level == 'error')
-# Whoops!
+@if ($level === 'error')
+# {{ __('Whoops!') }}
 @else
-# Hello!
+# {{ __('Hello!') }}
 @endif
 @endif
 
-{{-- Intro Lines --}}
+{{-- Intro lines --}}
 @foreach ($introLines as $line)
 {{ $line }}
 
 @endforeach
 
-{{-- Action Button --}}
-@if (isset($actionText))
+{{-- Action button --}}
+@isset($actionText)
 <?php
     switch ($level) {
         case 'success':
-            $color = 'green';
-            break;
         case 'error':
-            $color = 'red';
+            $color = $level;
             break;
         default:
-            $color = 'blue';
+            $color = 'primary';
     }
 ?>
 @component('mail::button', ['url' => $actionUrl, 'color' => $color])
 {{ $actionText }}
 @endcomponent
-@endif
+@endisset
 
-{{-- Outro Lines --}}
+{{-- Outro lines --}}
 @foreach ($outroLines as $line)
 {{ $line }}
 
 @endforeach
 
-<!-- Salutation -->
+{{-- Salutation --}}
 @if (! empty($salutation))
 {{ $salutation }}
 @else
-Regards,<br>{{ config('app.name') }}
+{{ __('Regards') }},<br>
+{{ config('app.name') }}
 @endif
 
-<!-- Subcopy -->
-@if (isset($actionText))
-@component('mail::subcopy')
-@lang('email.footer-link', ['actionText' => $actionText]) 
-[{{ $actionUrl }}]({{ $actionUrl }})
-@endcomponent
-@endif
+{{-- cspell:words subcopy --}}
+{{-- Subcopy --}}
+@isset($actionText)
+@slot('subcopy')
+{{ __(
+    "If you're having trouble clicking the \":actionText\" button, copy and paste the URL below\n".
+    'into your web browser:',
+    [
+        'actionText' => $actionText,
+    ]
+) }} <span class="break-all">[{{ $displayableActionUrl }}]({{ $actionUrl }})</span>
+@endslot
+@endisset
 @endcomponent

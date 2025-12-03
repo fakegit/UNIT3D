@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,6 +19,8 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Voter.
@@ -25,44 +30,37 @@ use Illuminate\Database\Eloquent\Model;
  * @property int                             $user_id
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\Poll $poll
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Voter newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Voter newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Voter query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Voter whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Voter whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Voter wherePollId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Voter whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Voter whereUserId($value)
- * @mixin \Eloquent
  */
-class Voter extends Model
+#[AllowDynamicProperties]
+final class Voter extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\VoterFactory> */
+    use HasFactory;
+
+    protected $guarded = [];
+
     /**
-     * Belongs To A Poll.
+     * Get the poll that was voted on.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Poll, $this>
      */
-    public function poll()
+    public function poll(): BelongsTo
     {
         return $this->belongsTo(Poll::class);
     }
 
     /**
-     * Belongs To A User.
+     * Get the user that voted.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 }

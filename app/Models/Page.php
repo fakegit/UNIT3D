@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,59 +16,50 @@
 
 namespace App\Models;
 
-use App\Helpers\BBCodeConverter;
-use App\Helpers\MarkdownExtra;
+use App\Helpers\Bbcode;
 use App\Traits\Auditable;
+use GrahamCampbell\Markdown\Facades\Markdown;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Page.
  *
  * @property int                             $id
  * @property string|null                     $name
- * @property string|null                     $slug
  * @property string|null                     $content
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Page newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Page newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Page query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Page whereContent($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Page whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Page whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Page whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Page whereSlug($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Page whereUpdatedAt($value)
- * @mixin \Eloquent
  */
-class Page extends Model
+#[AllowDynamicProperties]
+final class Page extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\PageFactory> */
+    use HasFactory;
+
     /**
-     * Set The Pages Content After Its Been Purified.
+     * The attributes that aren't mass assignable.
      *
-     * @param string $value
-     *
-     * @return void
+     * @var string[]
      */
-    public function setContentAttribute($value)
+    protected $guarded = ['id', 'created_at', 'updated_at'];
+
+    /**
+     * Set the pages content after it has been purified.
+     */
+    public function setContentAttribute(?string $value): void
     {
         $this->attributes['content'] = $value;
     }
 
     /**
-     * Parse Content And Return Valid HTML.
-     *
-     * @return string Convert BBCODE and Parse Markdown To HTML
+     * Parse content and return valid HTML.
      */
-    public function getContentHtml()
+    public function getContentHtml(): string
     {
-        $content = (new BBCodeConverter($this->content))->toMarkdown();
-
-        return (new MarkdownExtra())->text($content);
+        return Markdown::convert(htmlspecialchars_decode((new Bbcode())->parse($this->content, false), ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5))->getContent();
     }
 }

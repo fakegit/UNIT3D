@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,11 +19,17 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Playlist.
  *
  * @property int                             $id
+ * @property int                             $playlist_category_id
  * @property int                             $user_id
  * @property string                          $name
  * @property string                          $description
@@ -31,63 +40,67 @@ use Illuminate\Database\Eloquent\Model;
  * @property int                             $is_featured
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Comment[] $comments
- * @property-read int|null $comments_count
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\PlaylistTorrent[] $torrents
- * @property-read int|null $torrents_count
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Playlist newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Playlist newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Playlist query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Playlist whereCoverImage($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Playlist whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Playlist whereDescription($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Playlist whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Playlist whereIsFeatured($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Playlist whereIsPinned($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Playlist whereIsPrivate($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Playlist whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Playlist wherePosition($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Playlist whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Playlist whereUserId($value)
- * @mixin \Eloquent
  */
-class Playlist extends Model
+#[AllowDynamicProperties]
+final class Playlist extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\PlaylistFactory> */
+    use HasFactory;
+
+    protected $guarded = [];
+
     /**
-     * Belongs To A User.
+     * Get the user that owns the playlist.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Has Many Torrents.
+     * Get the category for the playlist.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return BelongsTo<PlaylistCategory, $this>
      */
-    public function torrents()
+    public function playlistCategory(): BelongsTo
     {
-        return $this->hasMany(PlaylistTorrent::class);
+        return $this->belongsTo(PlaylistCategory::class);
     }
 
     /**
-     * Has Many Comments.
+     * Get the torrents that belong to the playlist.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return BelongsToMany<Torrent, $this, PlaylistTorrent>
      */
-    public function comments()
+    public function torrents(): BelongsToMany
     {
-        return $this->hasMany(Comment::class, 'playlist_id');
+        return $this->belongsToMany(Torrent::class, 'playlist_torrents')->using(PlaylistTorrent::class)->withPivot('id')->withTimestamps();
+    }
+
+    /**
+     * Get the suggestions for this playlist.
+     *
+     * @return HasMany<PlaylistSuggestion, $this>
+     */
+    public function suggestions(): HasMany
+    {
+        return $this->hasMany(PlaylistSuggestion::class);
+    }
+
+    /**
+     * Get the comments for this playlist.
+     *
+     * @return MorphMany<Comment, $this>
+     */
+    public function comments(): MorphMany
+    {
+        return $this->morphMany(Comment::class, 'commentable');
     }
 }

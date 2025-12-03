@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,10 +17,8 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreApplicationRequest;
 use App\Models\Application;
-use App\Models\ApplicationImageProof;
-use App\Models\ApplicationUrlProof;
-use Illuminate\Http\Request;
 
 /**
  * @see \Tests\Todo\Feature\Http\Controllers\Staff\ApplicationControllerTest
@@ -29,81 +30,21 @@ class ApplicationController extends Controller
      */
     public function create(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        return \view('auth.application.create');
+        return view('auth.application.create');
     }
 
     /**
      * Store A New Application.
-     *
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function store(Request $request)
+    public function store(StoreApplicationRequest $request): \Illuminate\Http\RedirectResponse
     {
-        $application = \resolve(Application::class);
-        $application->type = $request->input('type');
-        $application->email = $request->input('email');
-        $application->referrer = $request->input('referrer');
+        abort_unless(config('other.application_signups'), 403);
 
-        if (\config('email-blacklist.enabled') == true) {
-            if (\config('captcha.enabled') == false) {
-                $v = \validator($request->all(), [
-                    'type'     => 'required',
-                    'email'    => 'required|string|email|max:70|blacklist|unique:invites|unique:users|unique:applications',
-                    'referrer' => 'required',
-                    'images.*' => 'filled',
-                    'images'   => 'min:2',
-                    'links.*'  => 'filled',
-                    'links'    => 'min:2',
-                ]);
-            } else {
-                $v = \validator($request->all(), [
-                    'type'     => 'required',
-                    'email'    => 'required|string|email|max:70|blacklist|unique:invites|unique:users|unique:applications',
-                    'referrer' => 'required',
-                    'images.*' => 'filled',
-                    'images'   => 'min:2',
-                    'links.*'  => 'filled',
-                    'links'    => 'min:2',
-                    'captcha'  => 'hiddencaptcha',
-                ]);
-            }
-        } elseif (\config('captcha.enabled') == false) {
-            $v = \validator($request->all(), [
-                'type'     => 'required',
-                'email'    => 'required|string|email|max:70|unique:invites|unique:users|unique:applications',
-                'referrer' => 'required',
-                'images.*' => 'filled',
-                'images'   => 'min:2',
-                'links.*'  => 'filled',
-                'links'    => 'min:2',
-            ]);
-        } else {
-            $v = \validator($request->all(), [
-                'type'     => 'required',
-                'email'    => 'required|string|email|max:70|unique:invites|unique:users|unique:applications',
-                'referrer' => 'required',
-                'images.*' => 'filled',
-                'images'   => 'min:2',
-                'links.*'  => 'filled',
-                'links'    => 'min:2',
-                'captcha'  => 'hiddencaptcha',
-            ]);
-        }
+        $application = Application::query()->create($request->validated('application'));
+        $application->imageProofs()->createMany($request->validated('images'));
+        $application->urlProofs()->createMany($request->validated('links'));
 
-        if ($v->fails()) {
-            return \redirect()->route('application.create')
-                ->withErrors($v->errors());
-        }
-        $application->save();
-        // Map And Save IMG Proofs
-        $imgs = \collect($request->input('images'))->map(fn ($value) => new ApplicationImageProof(['image' => $value]));
-        $application->imageProofs()->saveMany($imgs);
-        // Map And Save URL Proofs
-        $urls = \collect($request->input('links'))->map(fn ($value) => new ApplicationUrlProof(['url' => $value]));
-        $application->urlProofs()->saveMany($urls);
-
-        return \redirect()->route('login')
-            ->withSuccess(\trans('auth.application-submitted'));
+        return to_route('login')
+            ->with('success', trans('auth.application-submitted'));
     }
 }

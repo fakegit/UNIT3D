@@ -1,371 +1,1201 @@
-<div>
-	<table class="table table-condensed table-striped table-bordered" id="torrent-similar">
-		<thead>
-		<tr>
-			@if ($user->group->is_modo)
-			<th><input type="checkbox" wire:model="selectPage" style="vertical-align: middle;"></th>
-			@endif
-			<th class="torrents-filename">
-				<div sortable wire:click="sortBy('name')" :direction="$sortField === 'name' ? $sortDirection : null" role="button">
-					@lang('common.name')
-					@include('livewire.includes._sort-icon', ['field' => 'name'])
-				</div>
-			</th>
-			<th>
-				<div sortable wire:click="sortBy('created_at')" :direction="$sortField === 'created_at' ? $sortDirection : null" role="button">
-					@lang('common.created_at')
-					@include('livewire.includes._sort-icon', ['field' => 'created_at'])
-				</div>
-			</th>
-			<th>
-				<div sortable wire:click="sortBy('size')" :direction="$sortField === 'size' ? $sortDirection : null" role="button">
-					<i class="{{ config('other.font-awesome') }} fa-database"></i>
-					@include('livewire.includes._sort-icon', ['field' => 'size'])
-				</div>
-			</th>
-			<th>
-				<div sortable wire:click="sortBy('seeders')" :direction="$sortField === 'seeders' ? $sortDirection : null" role="button">
-					<i class="{{ config('other.font-awesome') }} fa-arrow-alt-circle-up"></i>
-					@include('livewire.includes._sort-icon', ['field' => 'seeders'])
-				</div>
-			</th>
-			<th>
-				<div sortable wire:click="sortBy('leechers')" :direction="$sortField === 'leechers' ? $sortDirection : null" role="button">
-					<i class="{{ config('other.font-awesome') }} fa-arrow-alt-circle-down"></i>
-					@include('livewire.includes._sort-icon', ['field' => 'leechers'])
-				</div>
-			</th>
-			<th>
-				<div sortable wire:click="sortBy('times_completed')" :direction="$sortField === 'times_completed' ? $sortDirection : null"
-				     role="button">
-					<i class="{{ config('other.font-awesome') }} fa-check-circle"></i>
-					@include('livewire.includes._sort-icon', ['field' => 'times_completed'])
-				</div>
-			</th>
-		</tr>
-		</thead>
-	</table>
+<div class="similar-torrents-list">
+    <div style="display: flex; flex-direction: column; gap: 16px">
+        <search class="compact-search similar-torrents__filters" x-data="toggle">
+            <div class="compact-search__visible-default">
+                <p class="form__group">
+                    <input
+                        id="name"
+                        wire:model.live="name"
+                        class="form__text"
+                        type="search"
+                        autocomplete="off"
+                        placeholder=" "
+                        @if (auth()->user()->settings->torrent_search_autofocus)
+                            autofocus
+                        @endif
+                    />
+                    <label class="form__label form__label--floating" for="name">
+                        {{ __('common.search') }}
+                    </label>
+                </p>
+                <button class="form__button form__standard-icon-button" x-on:click="toggle">
+                    <i class="{{ config('other.font-awesome') }} fa-sliders"></i>
+                </button>
+            </div>
+            <form class="form" x-cloak x-show="isToggledOn">
+                <div class="form__group--short-horizontal">
+                    <p class="form__group">
+                        <input
+                            id="description"
+                            wire:model.live="description"
+                            class="form__text"
+                            type="search"
+                            autocomplete="off"
+                            placeholder=" "
+                        />
+                        <label class="form__label form__label--floating" for="description">
+                            {{ __('torrent.description') }}
+                        </label>
+                    </p>
+                    <p class="form__group">
+                        <input
+                            id="mediainfo"
+                            wire:model.live="mediainfo"
+                            class="form__text"
+                            type="search"
+                            autocomplete="off"
+                            placeholder=" "
+                        />
+                        <label class="form__label form__label--floating" for="mediainfo">
+                            {{ __('torrent.media-info') }}
+                        </label>
+                    </p>
+                    <p class="form__group">
+                        <input
+                            id="keywords"
+                            wire:model.live="keywords"
+                            class="form__text"
+                            type="search"
+                            autocomplete="off"
+                            placeholder=" "
+                        />
+                        <label class="form__label form__label--floating" for="keywords">
+                            {{ __('torrent.keywords') }}
+                        </label>
+                    </p>
+                    <p class="form__group">
+                        <input
+                            id="uploader"
+                            wire:model.live="uploader"
+                            class="form__text"
+                            type="search"
+                            autocomplete="off"
+                            placeholder=" "
+                        />
+                        <label class="form__label form__label--floating" for="uploader">
+                            {{ __('torrent.uploader') }}
+                        </label>
+                    </p>
+                </div>
+                <div class="form__group--short-horizontal">
+                    <div class="form__group--short-horizontal">
+                        <p class="form__group">
+                            <input
+                                id="episodeNumber"
+                                wire:model.live="episodeNumber"
+                                class="form__text"
+                                inputmode="numeric"
+                                pattern="[0-9]*"
+                                placeholder=" "
+                            />
+                            <label class="form__label form__label--floating" for="episodeNumber">
+                                {{ __('torrent.episode-number') }}
+                            </label>
+                        </p>
+                        <p class="form__group">
+                            <input
+                                id="seasonNumber"
+                                wire:model.live="seasonNumber"
+                                class="form__text"
+                                inputmode="numeric"
+                                pattern="[0-9]*"
+                                placeholder=" "
+                            />
+                            <label class="form__label form__label--floating" for="seasonNumber">
+                                {{ __('torrent.season-number') }}
+                            </label>
+                        </p>
+                    </div>
+                    <div class="form__group--short-horizontal">
+                        <p class="form__group">
+                            <input
+                                id="minSize"
+                                wire:model.live="minSize"
+                                class="form__text"
+                                inputmode="numeric"
+                                pattern="[0-9]*"
+                                placeholder=" "
+                            />
+                            <label class="form__label form__label--floating" for="minSize">
+                                Minimum size
+                            </label>
+                        </p>
+                        <p class="form__group">
+                            <select
+                                id="minSizeMultiplier"
+                                wire:model.live="minSizeMultiplier"
+                                class="form__select"
+                                placeholder=" "
+                            >
+                                <option value="1" selected>Bytes</option>
+                                <option value="1000">KB</option>
+                                <option value="1024">KiB</option>
+                                <option value="1000000">MB</option>
+                                <option value="1048576">MiB</option>
+                                <option value="1000000000">GB</option>
+                                <option value="1073741824">GiB</option>
+                                <option value="1000000000000">TB</option>
+                                <option value="1099511627776">TiB</option>
+                            </select>
+                            <label
+                                class="form__label form__label--floating"
+                                for="minSizeMultiplier"
+                            >
+                                Unit
+                            </label>
+                        </p>
+                    </div>
+                    <div class="form__group--short-horizontal">
+                        <p class="form__group">
+                            <input
+                                id="maxSize"
+                                wire:model.live="maxSize"
+                                class="form__text"
+                                inputmode="numeric"
+                                pattern="[0-9]*"
+                                placeholder=" "
+                            />
+                            <label class="form__label form__label--floating" for="maxSize">
+                                Maximum size
+                            </label>
+                        </p>
+                        <p class="form__group">
+                            <select
+                                id="maxSizeMultiplier"
+                                wire:model.live="maxSizeMultiplier"
+                                class="form__select"
+                                placeholder=" "
+                            >
+                                <option value="1" selected>Bytes</option>
+                                <option value="1000">KB</option>
+                                <option value="1024">KiB</option>
+                                <option value="1000000">MB</option>
+                                <option value="1048576">MiB</option>
+                                <option value="1000000000">GB</option>
+                                <option value="1073741824">GiB</option>
+                                <option value="1000000000000">TB</option>
+                                <option value="1099511627776">TiB</option>
+                            </select>
+                            <label
+                                class="form__label form__label--floating"
+                                for="maxSizeMultiplier"
+                            >
+                                Unit
+                            </label>
+                        </p>
+                    </div>
+                </div>
+                <div class="form__group--short-horizontal">
+                    <p class="form__group">
+                        <input
+                            id="playlistId"
+                            wire:model.live="playlistId"
+                            class="form__text"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            placeholder=" "
+                        />
+                        <label class="form__label form__label--floating" for="playlistId">
+                            Playlist ID
+                        </label>
+                    </p>
+                </div>
+                <div class="form__group--short-horizontal">
+                    <div class="form__group">
+                        <fieldset class="form__fieldset">
+                            <legend class="form__legend">{{ __('torrent.type') }}</legend>
+                            <div class="form__fieldset-checkbox-container">
+                                @foreach ($types as $type)
+                                    <p class="form__group">
+                                        <label class="form__label">
+                                            <input
+                                                class="form__checkbox"
+                                                type="checkbox"
+                                                value="{{ $type->id }}"
+                                                wire:model.live="typeIds"
+                                            />
+                                            {{ $type->name }}
+                                        </label>
+                                    </p>
+                                @endforeach
+                            </div>
+                        </fieldset>
+                    </div>
+                    <div class="form__group">
+                        <fieldset class="form__fieldset">
+                            <legend class="form__legend">
+                                {{ __('torrent.resolution') }}
+                            </legend>
+                            <div class="form__fieldset-checkbox-container">
+                                @foreach ($resolutions as $resolution)
+                                    <p class="form__group">
+                                        <label class="form__label">
+                                            <input
+                                                class="form__checkbox"
+                                                type="checkbox"
+                                                value="{{ $resolution->id }}"
+                                                wire:model.live="resolutionIds"
+                                            />
+                                            {{ $resolution->name }}
+                                        </label>
+                                    </p>
+                                @endforeach
+                            </div>
+                        </fieldset>
+                    </div>
+                    <div class="form__group">
+                        <fieldset class="form__fieldset">
+                            <legend class="form__legend">Buff</legend>
+                            <div class="form__fieldset-checkbox-container">
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="0"
+                                            wire:model.live="free"
+                                        />
+                                        0% Freeleech
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="25"
+                                            wire:model.live="free"
+                                        />
+                                        25% Freeleech
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="50"
+                                            wire:model.live="free"
+                                        />
+                                        50% Freeleech
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="75"
+                                            wire:model.live="free"
+                                        />
+                                        75% Freeleech
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="100"
+                                            wire:model.live="free"
+                                        />
+                                        100% Freeleech
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="doubleup"
+                                        />
+                                        Double upload
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="featured"
+                                        />
+                                        Featured
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="refundable"
+                                        />
+                                        Refundable
+                                    </label>
+                                </p>
+                            </div>
+                        </fieldset>
+                    </div>
+                    <div class="form__group">
+                        <fieldset class="form__fieldset">
+                            <legend class="form__legend">Tags</legend>
+                            <div class="form__fieldset-checkbox-container">
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="internal"
+                                        />
+                                        {{ __('torrent.internal') }}
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="personalRelease"
+                                        />
+                                        {{ __('torrent.personal-release') }}
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="trumpable"
+                                        />
+                                        Trumpable
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="highspeed"
+                                        />
+                                        {{ __('common.high-speeds') }}
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="bookmarked"
+                                        />
+                                        {{ __('common.bookmarked') }}
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="wished"
+                                        />
+                                        {{ __('common.wished') }}
+                                    </label>
+                                </p>
+                            </div>
+                        </fieldset>
+                    </div>
+                    <div class="form__group">
+                        <fieldset class="form__fieldset">
+                            <legend class="form__legend">{{ __('torrent.health') }}</legend>
+                            <div class="form__fieldset-checkbox-container">
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="alive"
+                                        />
+                                        {{ __('torrent.alive') }}
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="dying"
+                                        />
+                                        Dying
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="dead"
+                                        />
+                                        Dead
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="graveyard"
+                                        />
+                                        {{ __('graveyard.graveyard') }}
+                                    </label>
+                                </p>
+                            </div>
+                        </fieldset>
+                    </div>
+                    <div class="form__group">
+                        <fieldset class="form__fieldset">
+                            <legend class="form__legend">{{ __('torrent.history') }}</legend>
+                            <div class="form__fieldset-checkbox-container">
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="notDownloaded"
+                                        />
+                                        Not downloaded
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="downloaded"
+                                        />
+                                        Downloaded
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="seeding"
+                                        />
+                                        Seeding
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="leeching"
+                                        />
+                                        Leeching
+                                    </label>
+                                </p>
+                                <p class="form__group">
+                                    <label class="form__label">
+                                        <input
+                                            class="form__checkbox"
+                                            type="checkbox"
+                                            value="1"
+                                            wire:model.live="incomplete"
+                                        />
+                                        Incomplete
+                                    </label>
+                                </p>
+                            </div>
+                        </fieldset>
+                    </div>
+                </div>
+            </form>
+        </search>
+        <section class="panelV2" x-data="torrentGroup">
+            <header class="panel__header">
+                <h2 class="panel__heading">{{ __('torrent.torrents') }}</h2>
+                <div class="panel__actions">
+                    @if ($checked && $user->group->is_modo)
+                        <div class="panel__action">
+                            <button
+                                class="form__button form__button--filled"
+                                wire:click="alertConfirm()"
+                            >
+                                Delete ({{ count($checked) }})
+                            </button>
+                        </div>
+                    @endif
 
-	<div>
-		@if ($checked && $user->group->is_modo)
-			<div class="dropdown">
-				<a class="dropdown btn btn-xs btn-warning" data-toggle="dropdown" href="#" aria-expanded="true">
-					With Checked ({{ count($checked) }})
-					<i class="fas fa-caret-circle-right"></i>
-				</a>
-				<ul class="dropdown-menu">
-					<li role="presentation">
-						<a role="menuitem" tabindex="-1" href="#" wire:click="alertConfirm()">
-							<span class="menu-text">Delete</span>
-							<span class="selected"></span>
-						</a>
-					</li>
-				</ul>
-			</div>
-		@endif
-	</div>
+                    @if ($user->group->is_modo)
+                        <div class="panel__action" title="{{ __('common.select') }}">
+                            <label class="form__label">
+                                Select all
+                                <input
+                                    class="form__checkbox"
+                                    type="checkbox"
+                                    wire:model.live="selectPage"
+                                />
+                            </label>
+                        </div>
+                    @endif
 
-	<div class="table-responsive mt-20">
-		<table class="table table-condensed table-bordered table-striped">
-			@foreach(App\Models\Type::all()->sortBy('position') as $type)
-				@if($torrents->where('type_id', '=', $type->id)->count() > 0)
-					<thead>
-					<tr>
-						<th class="text-center dark-th" colspan="12">
-							<span style="font-size: 16px;">{{ $type->name }}</span>
-						</th>
-					</tr>
-					</thead>
-				@endif
-				@foreach(App\Models\Resolution::all()->sortBy('position') as $resolution)
-					@if($torrents->where('type_id', '=', $type->id)->where('resolution_id', '=', $resolution->id)->count() > 0)
-						<thead>
-						<tr>
-							<th colspan="12">
-								<span class="label label-default text-bold">{{ $resolution->name }}</span>
-							</th>
-						</tr>
-						</thead>
-					@endif
-					<tbody>
-					@foreach($torrents->where('type_id', '=', $type->id)->where('resolution_id', '=', $resolution->id) as $torrent)
-						<tr>
-							@if ($user->group->is_modo)
-							<td><input type="checkbox" value="{{ $torrent->id }}" wire:model="checked" style="vertical-align: middle;"></td>
-							@endif
-							<td>
-								<a class="text-bright" style="font-size: 16px;" href="{{ route('torrent', ['id' => $torrent->id]) }}">
-									{{ $torrent->name }}
-								</a>
-								@if (config('torrent.download_check_page') == 1)
-									<a href="{{ route('download_check', ['id' => $torrent->id]) }}">
-										<button class="btn btn-primary btn-circle" type="button" data-toggle="tooltip"
-										        data-original-title="@lang('common.download')">
-											<i class="{{ config('other.font-awesome') }} fa-download"></i>
-										</button>
-									</a>
-								@else
-									<a href="{{ route('download', ['id' => $torrent->id]) }}">
-										<button class="btn btn-primary btn-circle" type="button" data-toggle="tooltip"
-										        data-original-title="@lang('common.download')">
-											<i class="{{ config('other.font-awesome') }} fa-download"></i>
-										</button>
-									</a>
-								@endif
+                    <div class="panel__action">
+                        <button class="form__button form__button--text" x-bind="all">
+                            Expand all
+                        </button>
+                    </div>
+                </div>
+            </header>
+            <div class="data-table-wrapper">
+                @if ($category->tv_meta)
+                    <section>
+                        @if (array_key_exists('Complete Pack', $similarTorrents))
+                            <details
+                                class="torrent-search--grouped__dropdown"
+                                open
+                                wire:ignore.self
+                            >
+                                <summary x-bind="complete">Complete pack</summary>
+                                <table class="similar-torrents__torrents">
+                                    <tbody>
+                                        @foreach ($similarTorrents['Complete Pack'] as $type => $torrents)
+                                            @foreach ($torrents as $torrent)
+                                                <tr>
+                                                    @if ($loop->first)
+                                                        <th
+                                                            class="similar-torrents__type"
+                                                            scope="rowgroup"
+                                                            rowspan="{{ $loop->count }}"
+                                                        >
+                                                            {{ $type }}
+                                                        </th>
+                                                    @endif
 
-								@php $history = App\Models\History::where('user_id', '=', $user->id)->where('info_hash', '=', $torrent->info_hash)->first() @endphp
-								@if ($history)
-									@if ($history->seeder == 1 && $history->active == 1)
-										<button class="btn btn-success btn-circle" type="button" data-toggle="tooltip"
-										        data-original-title="@lang('torrent.currently-seeding')!">
-											<i class="{{ config('other.font-awesome') }} fa-arrow-up"></i>
-										</button>
-									@endif
+                                                    @if ($user->group->is_modo)
+                                                        <td
+                                                            class="similar-torrents__checkbox"
+                                                            x-on:click.self="$el.firstElementChild.click()"
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                value="{{ $torrent->id }}"
+                                                                wire:model.live="checked"
+                                                            />
+                                                        </td>
+                                                    @endif
 
-									@if ($history->seeder == 0 && $history->active == 1)
-										<button class="btn btn-warning btn-circle" type="button" data-toggle="tooltip"
-										        data-original-title="@lang('torrent.currently-leeching')!">
-											<i class="{{ config('other.font-awesome') }} fa-arrow-down"></i>
-										</button>
-									@endif
+                                                    @include('components.partials._torrent-group-row')
+                                                </tr>
+                                            @endforeach
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </details>
+                        @endif
 
-									@if ($history->seeder == 0 && $history->active == 0 && $history->completed_at == null)
-										<button class="btn btn-info btn-circle" type="button" data-toggle="tooltip"
-										        data-original-title="@lang('torrent.not-completed')!">
-											<i class="{{ config('other.font-awesome') }} fa-spinner"></i>
-										</button>
-									@endif
+                        @if (array_key_exists('Specials', $similarTorrents))
+                            <details
+                                class="torrent-search--grouped__dropdown"
+                                @if ($checked || (! array_key_exists('Complete Pack', $similarTorrents) && ! array_key_exists('Seasons', $similarTorrents)))
+                                    open
+                                @endif
+                                wire:ignore.self
+                            >
+                                <summary x-bind="specials">Specials</summary>
+                                @foreach ($similarTorrents['Specials'] as $specialName => $special)
+                                    <details
+                                        class="torrent-search--grouped__dropdown"
+                                        @if ($checked || $loop->first)
+                                            open
+                                        @endif
+                                        wire:ignore.self
+                                    >
+                                        <summary x-bind="special">{{ $specialName }}</summary>
+                                        <table class="similar-torrents__torrents">
+                                            @foreach ($special as $type => $torrents)
+                                                <tbody>
+                                                    @foreach ($torrents as $torrent)
+                                                        <tr>
+                                                            @if ($loop->first)
+                                                                <th
+                                                                    class="similar-torrents__type"
+                                                                    scope="rowgroup"
+                                                                    rowspan="{{ $loop->count }}"
+                                                                >
+                                                                    {{ $type }}
+                                                                </th>
+                                                            @endif
 
-									@if ($history->seeder == 0 && $history->active == 0 && $history->completed_at != null)
-										<button class="btn btn-danger btn-circle" type="button" data-toggle="tooltip"
-										        data-original-title="@lang('torrent.completed-not-seeding')!">
-											<i class="{{ config('other.font-awesome') }} fa-thumbs-down"></i>
-										</button>
-									@endif
-								@endif
+                                                            @if ($user->group->is_modo)
+                                                                <td
+                                                                    class="similar-torrents__checkbox"
+                                                                    x-on:click.self="$el.firstElementChild.click()"
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        value="{{ $torrent->id }}"
+                                                                        wire:model.live="checked"
+                                                                    />
+                                                                </td>
+                                                            @endif
 
-								<br>
-								@if ($torrent->anon == 1)
-									<span class="badge-extra">
-										<i class="{{ config('other.font-awesome') }} fa-upload" data-toggle="tooltip"
-										   data-original-title="@lang('torrent.uploader')"></i> @lang('common.anonymous')
-										@if ($user->id == $torrent->user->id || $user->group->is_modo)
-											<a href="{{ route('users.show', ['username' => $torrent->user->username]) }}">
-												({{ $torrent->user->username }})
-											</a>
-										@endif
-                                    </span>
-								@else
-									<span class="badge-extra">
-										<i class="{{ config('other.font-awesome') }} fa-upload" data-toggle="tooltip"
-										   data-original-title="@lang('torrent.uploader')"></i>
-										<a href="{{ route('users.show', ['username' => $torrent->user->username]) }}">
-											{{ $torrent->user->username }}
-										</a>
-									</span>
-								@endif
+                                                            @include('components.partials._torrent-group-row')
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            @endforeach
+                                        </table>
+                                    </details>
+                                @endforeach
+                            </details>
+                        @endif
 
-								<span class="badge-extra text-pink">
-									<i class="{{ config('other.font-awesome') }} fa-heart" data-toggle="tooltip"
-									   data-original-title="@lang('torrent.thanks-given')"></i>
-									{{ $torrent->thanks_count }}
-								</span>
+                        @foreach ($similarTorrents['Seasons'] ?? [] as $seasonName => $season)
+                            <details
+                                class="torrent-search--grouped__dropdown"
+                                @if ($checked || $loop->first)
+                                    open
+                                @endif
+                                wire:ignore.self
+                            >
+                                <summary x-bind="season">{{ $seasonName }}</summary>
+                                @if (array_key_exists('Season Pack', $season) && ! array_key_exists('Episodes', $season))
+                                    <table class="similar-torrents__torrents">
+                                        @foreach ($season['Season Pack'] as $type => $torrents)
+                                            <tbody>
+                                                @foreach ($torrents as $torrent)
+                                                    <tr>
+                                                        @if ($loop->first)
+                                                            <th
+                                                                class="similar-torrents__type"
+                                                                scope="rowgroup"
+                                                                rowspan="{{ $loop->count }}"
+                                                            >
+                                                                {{ $type }}
+                                                            </th>
+                                                        @endif
 
-								<span class="badge-extra text-green">
-									<i class="{{ config('other.font-awesome') }} fa-comment" data-toggle="tooltip"
-									   data-original-title="@lang('common.comments')"></i>
-									{{ $torrent->comments_count }}
-								</span>
+                                                        @if ($user->group->is_modo)
+                                                            <td
+                                                                class="similar-torrents__checkbox"
+                                                                x-on:click.self="$el.firstElementChild.click()"
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    value="{{ $torrent->id }}"
+                                                                    wire:model.live="checked"
+                                                                />
+                                                            </td>
+                                                        @endif
 
-								@if ($torrent->internal == 1)
-									<span class='badge-extra'>
-										<i class='{{ config('other.font-awesome') }} fa-magic' data-toggle='tooltip'
-										   title='' data-original-title='@lang('torrent.internal-release')'
-										   style="color: #baaf92;"></i>
-									</span>
-								@endif
+                                                        @include('components.partials._torrent-group-row')
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        @endforeach
+                                    </table>
+                                @elseif (array_key_exists('Season Pack', $season))
+                                    <details
+                                        open
+                                        class="torrent-search--grouped__dropdown"
+                                        wire:ignore.self
+                                    >
+                                        <summary x-bind="pack">Season pack</summary>
+                                        <table class="similar-torrents__torrents">
+                                            @foreach ($season['Season Pack'] as $type => $torrents)
+                                                <tbody>
+                                                    @foreach ($torrents as $torrent)
+                                                        <tr>
+                                                            @if ($loop->first)
+                                                                <th
+                                                                    class="similar-torrents__type"
+                                                                    scope="rowgroup"
+                                                                    rowspan="{{ $loop->count }}"
+                                                                >
+                                                                    {{ $type }}
+                                                                </th>
+                                                            @endif
 
-								@if ($torrent->stream == 1)
-									<span class='badge-extra'>
-										<i class='{{ config('other.font-awesome') }} fa-play text-red' data-toggle='tooltip'
-										   title='' data-original-title='@lang('torrent.stream-optimized')'></i>
-									</span>
-								@endif
+                                                            @if ($user->group->is_modo)
+                                                                <td
+                                                                    class="similar-torrents__checkbox"
+                                                                    x-on:click.self="$el.firstElementChild.click()"
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        value="{{ $torrent->id }}"
+                                                                        wire:model.live="checked"
+                                                                    />
+                                                                </td>
+                                                            @endif
 
-								@if ($torrent->featured == 0)
-									@if ($torrent->doubleup == 1)
-										<span class='badge-extra'>
-											<i class='{{ config('other.font-awesome') }} fa-gem text-green'
-											   data-toggle='tooltip' title='' data-original-title='@lang('torrent.double-upload')'></i>
-										</span>
-									@endif
-									@if ($torrent->free == 1)
-										<span class='badge-extra'>
-											<i class='{{ config('other.font-awesome') }} fa-star text-gold'
-											   data-toggle='tooltip' title='' data-original-title='@lang('torrent.freeleech')'></i>
-										</span>
-									@endif
-								@endif
+                                                            @include('components.partials._torrent-group-row')
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            @endforeach
+                                        </table>
+                                    </details>
+                                @endif
 
-								@if ($personalFreeleech)
-									<span class='badge-extra'>
-										<i class='{{ config('other.font-awesome') }} fa-id-badge text-orange'
-										   data-toggle='tooltip' title='' data-original-title='@lang('torrent.personal-freeleech')'></i>
-									</span>
-								@endif
+                                @foreach ($season['Episodes'] ?? [] as $episodeName => $episode)
+                                    <details
+                                        class="torrent-search--grouped__dropdown"
+                                        @if ($checked || ($loop->first && ! array_key_exists('Season Pack', $season)))
+                                            open
+                                        @endif
+                                        wire:ignore.self
+                                    >
+                                        <summary x-bind="episode">{{ $episodeName }}</summary>
+                                        <table class="similar-torrents__torrents">
+                                            @foreach ($episode as $type => $torrents)
+                                                <tbody>
+                                                    @foreach ($torrents as $torrent)
+                                                        <tr>
+                                                            @if ($loop->first)
+                                                                <th
+                                                                    class="similar-torrents__type"
+                                                                    scope="rowgroup"
+                                                                    rowspan="{{ $loop->count }}"
+                                                                >
+                                                                    {{ $type }}
+                                                                </th>
+                                                            @endif
 
-								@php $freeleech_token = App\Models\FreeleechToken::where('user_id', '=', $user->id)->where('torrent_id', '=', $torrent->id)->first() @endphp
-								@if ($freeleech_token)
-									<span class='badge-extra'>
-										<i class='{{ config('other.font-awesome') }} fa-star'
-										   data-toggle='tooltip' title='' data-original-title='@lang('torrent.freeleech-token')'></i>
-									</span>
-								@endif
+                                                            @if ($user->group->is_modo)
+                                                                <td
+                                                                    class="similar-torrents__checkbox"
+                                                                    x-on:click.self="$el.firstElementChild.click()"
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        value="{{ $torrent->id }}"
+                                                                        wire:model.live="checked"
+                                                                    />
+                                                                </td>
+                                                            @endif
 
-								@if ($torrent->featured == 1)
-									<span class='badge-extra' style='background-image:url(/img/sparkels.gif);'>
-										<i class='{{ config('other.font-awesome') }} fa-certificate text-pink'
-										   data-toggle='tooltip' title='' data-original-title='@lang('torrent.featured')'></i>
-									</span>
-								@endif
+                                                            @include('components.partials._torrent-group-row')
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            @endforeach
+                                        </table>
+                                    </details>
+                                @endforeach
+                            </details>
+                        @endforeach
+                    </section>
+                @elseif ($category->movie_meta)
+                    <table class="similar-torrents__torrents">
+                        <thead>
+                            <tr class="similar-torrents__headers">
+                                <th class="similar-torrents__type-header">
+                                    {{ __('torrent.type') }}
+                                </th>
+                                @if ($user->group->is_modo)
+                                    <th
+                                        class="similar-torrents__checkbox-header"
+                                        title="{{ __('common.select') }}"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            wire:model.live="selectPage"
+                                            style="vertical-align: middle"
+                                        />
+                                    </th>
+                                @endif
 
-								@if ($user->group->is_freeleech == 1)
-									<span class='badge-extra'>
-										<i class='{{ config('other.font-awesome') }} fa-trophy text-purple'
-										   data-toggle='tooltip' title='' data-original-title='@lang('torrent.special-freeleech')'></i>
-									</span>
-								@endif
+                                <th class="similar-torrents__name-header">
+                                    {{ __('torrent.name') }}
+                                </th>
+                                <th class="similar-torrents__actions-header" colspan="3">
+                                    {{ __('common.actions') }}
+                                </th>
+                                <th class="similar-torrents__size-header">
+                                    {{ __('torrent.size') }}
+                                </th>
+                                <th
+                                    class="similar-torrents__seeders-header"
+                                    title="{{ __('torrent.seeders') }}"
+                                >
+                                    <i class="fas fa-arrow-alt-circle-up"></i>
+                                </th>
+                                <th
+                                    class="similar-torrents__leechers-header"
+                                    title="{{ __('torrent.leechers') }}"
+                                >
+                                    <i class="fas fa-arrow-alt-circle-down"></i>
+                                </th>
+                                <th
+                                    class="similar-torrents__completed-header"
+                                    title="{{ __('torrent.completed') }}"
+                                >
+                                    <i class="fas fa-check-circle"></i>
+                                </th>
+                                <th class="similar-torrents__age-header">
+                                    {{ __('torrent.age') }}
+                                </th>
+                            </tr>
+                        </thead>
+                        @foreach ($similarTorrents as $type => $torrents)
+                            <tbody>
+                                @foreach ($torrents as $torrent)
+                                    <tr>
+                                        @if ($loop->first)
+                                            <th
+                                                class="similar-torrents__type"
+                                                scope="rowgroup"
+                                                rowspan="{{ $loop->count }}"
+                                            >
+                                                {{ $type }}
+                                            </th>
+                                        @endif
 
-								@if (config('other.freeleech') == 1)
-									<span class='badge-extra'>
-										<i class='{{ config('other.font-awesome') }} fa-globe text-blue'
-										   data-toggle='tooltip' title='' data-original-title='@lang('torrent.global-freeleech')'></i>
-									</span>
-								@endif
+                                        @if ($user->group->is_modo)
+                                            <td
+                                                class="similar-torrents__checkbox"
+                                                x-on:click.self="$el.firstElementChild.click()"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    value="{{ $torrent->id }}"
+                                                    wire:model.live="checked"
+                                                />
+                                            </td>
+                                        @endif
 
-								@if (config('other.doubleup') == 1)
-									<span class='badge-extra'>
-										<i class='{{ config('other.font-awesome') }} fa-globe text-green'
-										   data-toggle='tooltip' title='' data-original-title='@lang('torrent.double-upload')'></i>
-									</span>
-								@endif
+                                        @include('components.partials._torrent-group-row')
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        @endforeach
+                    </table>
+                @elseif ($category->game_meta)
+                    <table class="similar-torrents__torrents">
+                        <thead>
+                            <tr class="similar-torrents__headers">
+                                <th class="similar-torrents__type-header">
+                                    {{ __('torrent.type') }}
+                                </th>
+                                @if ($user->group->is_modo)
+                                    <th
+                                        class="similar-torrents__checkbox-header"
+                                        title="{{ __('common.select') }}"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            wire:model.live="selectPage"
+                                            style="vertical-align: middle"
+                                        />
+                                    </th>
+                                @endif
 
-								@if ($user->group->is_double_upload == 1)
-									<span class='badge-extra'>
-										<i class='{{ config('other.font-awesome') }} fa-trophy text-purple'
-										   data-toggle='tooltip' title='' data-original-title='@lang('torrent.special-double_upload')'></i>
-									</span>
-								@endif
+                                <th class="similar-torrents__name-header">
+                                    {{ __('torrent.name') }}
+                                </th>
+                                <th class="similar-torrents__actions-header" colspan="3">
+                                    {{ __('common.actions') }}
+                                </th>
+                                <th class="similar-torrents__size-header">
+                                    {{ __('torrent.size') }}
+                                </th>
+                                <th
+                                    class="similar-torrents__seeders-header"
+                                    title="{{ __('torrent.seeders') }}"
+                                >
+                                    <i class="fas fa-arrow-alt-circle-up"></i>
+                                </th>
+                                <th
+                                    class="similar-torrents__leechers-header"
+                                    title="{{ __('torrent.leechers') }}"
+                                >
+                                    <i class="fas fa-arrow-alt-circle-down"></i>
+                                </th>
+                                <th
+                                    class="similar-torrents__completed-header"
+                                    title="{{ __('torrent.completed') }}"
+                                >
+                                    <i class="fas fa-check-circle"></i>
+                                </th>
+                                <th class="similar-torrents__age-header">
+                                    {{ __('torrent.age') }}
+                                </th>
+                            </tr>
+                        </thead>
+                        @foreach ($similarTorrents as $type => $torrents)
+                            <tbody>
+                                @foreach ($torrents as $torrent)
+                                    <tr>
+                                        @if ($loop->first)
+                                            <th
+                                                class="similar-torrents__type"
+                                                scope="rowgroup"
+                                                rowspan="{{ $loop->count }}"
+                                            >
+                                                {{ $type }}
+                                            </th>
+                                        @endif
 
-								@if ($torrent->leechers >= 5)
-									<span class='badge-extra'>
-										<i class='{{ config('other.font-awesome') }} fa-fire text-orange'
-										   data-toggle='tooltip' title='' data-original-title='@lang('common.hot')!'></i>
-									</span>
-								@endif
+                                        @if ($user->group->is_modo)
+                                            <td
+                                                class="similar-torrents__checkbox"
+                                                x-on:click.self="$el.firstElementChild.click()"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    value="{{ $torrent->id }}"
+                                                    wire:model.live="checked"
+                                                />
+                                            </td>
+                                        @endif
 
-								@if ($torrent->sticky == 1)
-									<span class='badge-extra'>
-										<i class='{{ config('other.font-awesome') }} fa-thumbtack text-black'
-										   data-toggle='tooltip' title='' data-original-title='@lang('torrent.sticky')!'></i>
-									</span>
-								@endif
+                                        @include('components.partials._torrent-group-row')
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        @endforeach
+                    </table>
+                @endif
+            </div>
+        </section>
+        <section class="panelV2">
+            <header style="cursor: pointer" class="panel__header">
+                <h2 class="panel__heading">
+                    {{ __('request.requests') }}
+                </h2>
+                <div class="panel__actions">
+                    <div class="panel__action">
+                        <label class="form__label">
+                            Hide filled requests
+                            <input
+                                class="form__checkbox"
+                                type="checkbox"
+                                wire:model.live="hideFilledRequests"
+                            />
+                        </label>
+                    </div>
+                    <div class="panel__action">
+                        <a
+                            href="{{
+                                route('requests.create', [
+                                    'category_id' => $category->id,
+                                    'title' => rawurlencode(
+                                        $category->movie_meta
+                                            ? ($work?->title ?? '') . ' ' . substr($work->release_date ?? '', 0, 4)
+                                            : ($work?->name ?? '') . ' ' . substr($work->first_air_date ?? '', 0, 4)
+                                    ),
+                                    'imdb' => $work?->imdb_id ?? '',
+                                    'tmdb_movie_id' => $category->movie_meta ? $tmdbId ?? '' : '',
+                                    'tmdb_tv_id' => $category->tv_meta ? $tmdbId ?? '' : '',
+                                    'tvdb' => $work->tvdb_id ?? '',
+                                    'igdb' => $igdb ?? '',
+                                ])
+                            }}"
+                            class="form__button form__button--text"
+                        >
+                            {{ __('request.add-request') }}
+                        </a>
+                    </div>
+                </div>
+            </header>
+            <div class="data-table-wrapper">
+                <table class="data-table">
+                    <tbody>
+                        @forelse ($torrentRequests as $torrentRequest)
+                            <tr>
+                                <td>
+                                    <a
+                                        href="{{ route('requests.show', ['torrentRequest' => $torrentRequest]) }}"
+                                    >
+                                        {{ $torrentRequest->name }}
+                                    </a>
+                                </td>
+                                <td>{{ $torrentRequest->category->name }}</td>
+                                <td>{{ $torrentRequest->type->name ?? 'Any' }}</td>
+                                <td>{{ $torrentRequest->resolution->name ?? 'Any' }}</td>
+                                <td>
+                                    <x-user-tag
+                                        :user="$torrentRequest->user"
+                                        :anon="$torrentRequest->anon"
+                                    />
+                                </td>
+                                <td>{{ $torrentRequest->votes }}</td>
+                                <td>{{ $torrentRequest->comments_count }}</td>
+                                <td>{{ number_format($torrentRequest->bounty) }}</td>
+                                <td>
+                                    <time
+                                        datetime="{{ $torrentRequest->created_at }}"
+                                        title="{{ $torrentRequest->created_at }}"
+                                    >
+                                        {{ $torrentRequest->created_at->diffForHumans() }}
+                                    </time>
+                                </td>
+                                <td>
+                                    @switch(true)
+                                        @case($torrentRequest->claim_exists && $torrentRequest->torrent_id === null)
+                                            <i class="fas fa-circle text-blue"></i>
+                                            {{ __('request.claimed') }}
 
-								@if ($user->updated_at->getTimestamp() < $torrent->created_at->getTimestamp())
-									<span class='badge-extra'>
-										<i class='{{ config('other.font-awesome') }} fa-magic text-black'
-										   data-toggle='tooltip' title='' data-original-title='@lang('common.new')!'></i>
-									</span>
-								@endif
+                                            @break
+                                        @case($torrentRequest->torrent_id !== null && $torrentRequest->approved_when === null)
+                                            <i class="fas fa-circle text-purple"></i>
+                                            {{ __('request.pending') }}
 
-								@if ($torrent->highspeed == 1)
-									<span class='badge-extra'>
-										<i class='{{ config('other.font-awesome') }} fa-tachometer text-red'
-										   data-toggle='tooltip' title='' data-original-title='@lang('common.high-speeds')'></i>
-									</span>
-								@endif
+                                            @break
+                                        @case($torrentRequest->torrent_id === null)
+                                            <i class="fas fa-circle text-red"></i>
+                                            {{ __('request.unfilled') }}
 
-								@if ($torrent->sd == 1)
-									<span class='badge-extra'>
-										<i class='{{ config('other.font-awesome') }} fa-ticket text-orantorrent.sd-content' )!'></i>
-									</span>
-								@endif
-							</td>
+                                            @break
+                                        @default
+                                            <i class="fas fa-circle text-green"></i>
+                                            {{ __('request.filled') }}
 
-							<td>
-								<time>{{ $torrent->created_at->diffForHumans() }}</time>
-							</td>
-							<td>
-								<span class='badge-extra text-blue'>{{ $torrent->getSize() }}</span>
-							</td>
-							<td>
-								<a href="{{ route('peers', ['id' => $torrent->id]) }}">
-									<span class='badge-extra text-green'>
-										{{ $torrent->seeders }}
-									</span>
-								</a>
-							</td>
-							<td>
-								<a href="{{ route('peers', ['id' => $torrent->id]) }}">
-									<span class='badge-extra text-red'>
-										{{ $torrent->leechers }}
-									</span>
-								</a>
-							</td>
-							<td>
-								<a href="{{ route('history', ['id' => $torrent->id]) }}">
-									<span class='badge-extra text-orange'>
-										{{ $torrent->times_completed }} @lang('common.times')
-									</span>
-								</a>
-							</td>
-						</tr>
-					@endforeach
-					</tbody>
-				@endforeach
-			@endforeach
-		</table>
-	</div>
+                                            @break
+                                    @endswitch
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="10">{{ __('common.no-result') }}</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        @if ($collectionMovies?->isNotEmpty())
+            <section class="panelV2">
+                <header class="panel__header">
+                    <h2 class="panel__heading">{{ __('mediahub.collection') }}</h2>
+                    <div class="panel__actions" x-data="posterRow">
+                        <div class="panel__action">
+                            <button class="form__standard-icon-button" x-bind="scrollLeft">
+                                <i class="{{ \config('other.font-awesome') }} fa-angle-left"></i>
+                            </button>
+                        </div>
+                        <div class="panel__action">
+                            <button class="form__standard-icon-button" x-bind="scrollRight">
+                                <i class="{{ \config('other.font-awesome') }} fa-angle-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </header>
+                <div
+                    class="panel__body collection-posters"
+                    x-ref="posters"
+                    style="max-height: 330px !important"
+                >
+                    @foreach ($collectionMovies as $collectionMovie)
+                        <x-movie.poster :movie="$collectionMovie" :categoryId="$category->id" />
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
+        <livewire:also-downloaded-works
+            :work="$work->withoutRelations()"
+            :categoryId="$category->id"
+        />
+
+        @if ($playlistCategories->isNotEmpty())
+            <section class="panelV2">
+                <h2 class="panel__heading">{{ __('playlist.playlists') }}</h2>
+                <div class="data-table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <th>{{ __('common.category') }}</th>
+                            <th>{{ __('common.name') }}</th>
+                            <th>{{ __('playlist.titles') }}</th>
+                            <th>{{ __('common.author') }}</th>
+                        </thead>
+                        <tbody>
+                            @foreach ($playlistCategories as $playlistCategory)
+                                @foreach ($playlistCategory->playlists as $playlist)
+                                    <tr>
+                                        @if ($loop->first)
+                                            <td rowspan="{{ $loop->count }}">
+                                                {{ $playlist->playlistCategory->name }}
+                                            </td>
+                                        @endif
+
+                                        <td>
+                                            <a
+                                                href="{{ route('playlists.show', ['playlist' => $playlist]) }}"
+                                            >
+                                                {{ $playlist->name }}
+                                            </a>
+                                        </td>
+                                        <td>{{ $playlist->torrents_count }}</td>
+                                        <td>
+                                            <x-user-tag :user="$playlist->user" :anon="false" />
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        @endif
+    </div>
 </div>
 
 @section('javascripts')
-	@if ($user->group->is_modo)
-	<script nonce="{{ Bepsvpt\SecureHeaders\SecureHeaders::nonce('script') }}">
-      window.addEventListener('swal:modal', event => {
-        Swal.fire({
-          title: event.detail.message,
-          text: event.detail.text,
-          icon: event.detail.type,
-        })
-      })
+    @if ($user->group->is_modo)
+        <script nonce="{{ HDVinnie\SecureHeaders\SecureHeaders::nonce('script') }}">
+            window.addEventListener('swal:modal', event => {
+              Swal.fire({
+                title: event.detail.message,
+                text: event.detail.text,
+                icon: event.detail.type,
+              })
+            })
 
-      window.addEventListener('swal:confirm', event => {
-        const { value: text } = Swal.fire({
-          input: 'textarea',
-          inputLabel: 'Delete Reason',
-          inputPlaceholder: 'Type your reason here...',
-          inputAttributes: {
-            'aria-label': 'Type your reason here'
-          },
-          inputValidator: (value) => {
-            if (!value) {
-              return 'You need to write something!'
-            }
-          },
-          title: event.detail.message,
-          html: event.detail.body,
-          icon: event.detail.type,
-          showCancelButton: true,
-          confirmButtonColor: '#3085d6',
-          cancelButtonColor: '#d33',
-          confirmButtonText: 'Yes, delete it!',
-        }).then((result) => {
-          if (result.isConfirmed) {
-          @this.set('reason', result.value);
-            Livewire.emit('destroy')
-          }
-        })
-      })
-	</script>
-	@endif
+            window.addEventListener('swal:confirm', event => {
+              const { value: text } = Swal.fire({
+                input: 'textarea',
+                inputLabel: 'Delete reason',
+                inputPlaceholder: 'Type your reason here...',
+                inputAttributes: {
+                  'aria-label': 'Type your reason here'
+                },
+                inputValidator: (value) => {
+                  if (!value) {
+                    return 'You need to write something!'
+                  }
+                },
+                title: event.detail.message,
+                html: event.detail.body,
+                icon: event.detail.type,
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, delete it!',
+              }).then((result) => {
+                if (result.isConfirmed) {
+                @this.set('reason', result.value);
+                  Livewire.dispatch('destroy')
+                }
+              })
+            })
+        </script>
+    @endif
 @endsection

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,6 +19,9 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Wish.
@@ -23,48 +29,55 @@ use Illuminate\Database\Eloquent\Model;
  * @property int                             $id
  * @property int                             $user_id
  * @property string                          $title
- * @property string                          $imdb
- * @property string                          $type
- * @property string|null                     $source
+ * @property int                             $tmdb_movie_id
+ * @property int                             $tmdb_tv_id
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Wish newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Wish newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Wish query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Wish whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Wish whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Wish whereImdb($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Wish whereSource($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Wish whereTitle($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Wish whereType($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Wish whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Wish whereUserId($value)
- * @mixin \Eloquent
  */
-class Wish extends Model
+#[AllowDynamicProperties]
+final class Wish extends Model
 {
-    use HasFactory;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\WishFactory> */
+    use HasFactory;
+
     /**
-     * The Attributes That Aren't Mass Assignable.
+     * The attributes that aren't mass assignable.
      *
-     * @var array
+     * @var string[]
      */
     protected $guarded = [];
 
     /**
-     * Belongs To A User.
+     * Get the user that owns the wish.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function user()
+    public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class)->withDefault([
-            'username' => 'System',
-            'id'       => '1',
-        ]);
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the movie torrents for the wish.
+     *
+     * @return HasMany<Torrent, $this>
+     */
+    public function movieTorrents(): HasMany
+    {
+        return $this->hasMany(Torrent::class, 'tmdb_movie_id', 'tmdb_movie_id')
+            ->whereRelation('category', 'movie_meta', '=', true);
+    }
+
+    /**
+     * Get the tv torrents for the wish.
+     *
+     * @return HasMany<Torrent, $this>
+     */
+    public function tvTorrents(): HasMany
+    {
+        return $this->hasMany(Torrent::class, 'tmdb_tv_id', 'tmdb_tv_id')
+            ->whereRelation('category', 'tv_meta', '=', true);
     }
 }

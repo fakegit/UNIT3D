@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,7 +16,6 @@
 
 namespace App\Notifications;
 
-use App\Models\Follow;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -26,35 +28,49 @@ class NewFollow extends Notification implements ShouldQueue
     /**
      * NewFollow Constructor.
      */
-    public function __construct(public string $type, public User $sender, public User $target, public Follow $follow)
+    public function __construct(public string $type, public User $follower)
     {
     }
 
     /**
      * Get the notification's delivery channels.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<int, string>
      */
-    public function via($notifiable)
+    public function via(object $notifiable): array
     {
         return ['database'];
     }
 
     /**
+     * Determine if the notification should be sent.
+     */
+    public function shouldSend(User $notifiable): bool
+    {
+        if ($notifiable->notification?->block_notifications === 1) {
+            return false;
+        }
+
+        if ($notifiable->notification?->show_account_follow === 0) {
+            return false;
+        }
+
+        // If the sender's group ID is found in the "Block all notifications from the selected groups" array,
+        // the expression will return false.
+        return ! \in_array($this->follower->group_id, $notifiable->notification?->json_following_groups ?? [], true);
+    }
+
+    /**
      * Get the array representation of the notification.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<string, mixed>
      */
-    public function toArray($notifiable)
+    public function toArray(object $notifiable): array
     {
         return [
-            'title' => $this->sender->username.' Has Followed You!',
-            'body'  => $this->sender->username.' has started to follow you so they will get notifications about your activities.',
-            'url'   => \sprintf('/users/%s', $this->sender->username),
+            'title' => $this->follower->username.' Has Followed You!',
+            'body'  => $this->follower->username.' has started to follow you so they will get notifications about your activities.',
+            'url'   => '/users/'.$this->follower->username,
         ];
     }
 }

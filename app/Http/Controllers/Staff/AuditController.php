@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -15,7 +18,8 @@ namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\Audit;
-use Illuminate\Http\Request;
+use App\Models\User;
+use Exception;
 
 /**
  * @see \Tests\Todo\Feature\Http\Controllers\Staff\AuditControllerTest
@@ -27,29 +31,33 @@ class AuditController extends Controller
      */
     public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $audits = Audit::with('user')->latest()->paginate(50);
-
-        return \view('Staff.audit.index', ['audits' => $audits]);
+        return view('Staff.audit.index', [
+            'staffUsers' => User::query()
+                ->with(['group'])
+                ->whereHas('group', function ($query): void {
+                    $query->where('is_modo', '=', true)
+                        ->orWhere('is_editor', '=', true);
+                })
+                ->withCount([
+                    'audits as total_actions' => fn ($query) => $query->where('action', '!=', 'create'),
+                    'audits as last_60_days'  => fn ($query) => $query->where('action', '!=', 'create')->whereBetween('created_at', [now()->subDays(60), now()]),
+                    'audits as last_30_days'  => fn ($query) => $query->where('action', '!=', 'create')->whereBetween('created_at', [now()->subDays(30), now()]),
+                ])
+                ->get()
+                ->sortBy(fn ($user) => $user->group->level)
+        ]);
     }
 
     /**
      * Delete A Audit.
      *
-     * @param \App\Models\Audit $id
-     *
-     * @throws \Exception
-     *
-     * @return \Illuminate\Http\RedirectResponse
+     * @throws Exception
      */
-    public function destroy(Request $request, $id)
+    public function destroy(Audit $audit): \Illuminate\Http\RedirectResponse
     {
-        $user = $request->user();
-        $audit = Audit::findOrFail($id);
-
-        \abort_unless($user->group->is_modo, 403);
         $audit->delete();
 
-        return \redirect()->route('staff.audits.index')
-            ->withSuccess('Audit Record Has Successfully Been Deleted');
+        return to_route('staff.audits.index')
+            ->with('success', 'Audit record has successfully been deleted');
     }
 }

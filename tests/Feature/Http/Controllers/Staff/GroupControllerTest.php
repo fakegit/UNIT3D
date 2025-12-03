@@ -1,146 +1,151 @@
 <?php
 
-namespace Tests\Feature\Http\Controllers\Staff;
-
-use App\Models\Group;
-use App\Models\User;
-use Database\Seeders\GroupsTableSeeder;
-use Tests\TestCase;
+declare(strict_types=1);
 
 /**
- * @see \App\Http\Controllers\Staff\GroupController
+ * NOTICE OF LICENSE.
+ *
+ * UNIT3D Community Edition is open-sourced software licensed under the GNU Affero General Public License v3.0
+ * The details is bundled with this project in the file LICENSE.txt.
+ *
+ * @project    UNIT3D Community Edition
+ *
+ * @author     HDVinnie <hdinnovations@protonmail.com>
+ * @license    https://www.gnu.org/licenses/agpl-3.0.en.html/ GNU Affero General Public License v3.0
  */
-class GroupControllerTest extends TestCase
-{
-    protected function setUp(): void
-    {
-        parent::setUp();
-    }
 
-    protected function createStaffUser()
-    {
-        return User::factory()->create([
-            'group_id' => fn () => Group::factory()->create([
-                'is_owner' => true,
-                'is_admin' => true,
-                'is_modo'  => true,
-            ])->id,
-        ]);
-    }
+use App\Http\Controllers\Staff\GroupController;
+use App\Http\Requests\Staff\StoreGroupRequest;
+use App\Http\Requests\Staff\UpdateGroupRequest;
+use App\Models\Forum;
+use App\Models\Group;
 
-    /**
-     * @test
-     */
-    public function create_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
+use function Pest\Laravel\assertDatabaseHas;
 
-        $user = $this->createStaffUser();
+test('create returns an ok response', function (): void {
+    $this->get(route('staff.groups.create'))
+        ->assertOk()
+        ->assertViewIs('Staff.group.create');
+});
 
-        $response = $this->actingAs($user)->get(route('staff.groups.create'));
+test('edit returns an ok response', function (): void {
+    $group = Group::factory()->create();
 
-        $response->assertOk();
-        $response->assertViewIs('Staff.group.create');
-    }
+    $this->get(route('staff.groups.edit', [$group]))
+        ->assertOk()
+        ->assertViewIs('Staff.group.edit')
+        ->assertViewHas('group', $group);
+});
 
-    /**
-     * @test
-     */
-    public function edit_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
+test('index returns an ok response', function (): void {
+    Group::factory()->times(3)->create();
 
-        $user = $this->createStaffUser();
-        $group = Group::factory()->create();
+    $this->get(route('staff.groups.index'))
+        ->assertOk()
+        ->assertViewIs('Staff.group.index')
+        ->assertViewHas('groups');
+});
 
-        $response = $this->actingAs($user)->get(route('staff.groups.edit', ['id' => $group->id]));
+test('store validates with a form request', function (): void {
+    $this->assertActionUsesFormRequest(
+        GroupController::class,
+        'store',
+        StoreGroupRequest::class
+    );
+});
 
-        $response->assertOk();
-        $response->assertViewIs('Staff.group.edit');
-        $response->assertViewHas('group');
-    }
+test('store returns an ok response', function (): void {
+    $group = Group::factory()->make();
+    $forum = Forum::factory()->create();
 
-    /**
-     * @test
-     */
-    public function index_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
-
-        $user = $this->createStaffUser();
-
-        $response = $this->actingAs($user)->get(route('staff.groups.index'));
-
-        $response->assertOk();
-        $response->assertViewIs('Staff.group.index');
-        $response->assertViewHas('groups');
-    }
-
-    /**
-     * @test
-     */
-    public function store_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
-
-        $user = $this->createStaffUser();
-        $group = Group::factory()->make();
-
-        $response = $this->actingAs($user)->post(route('staff.groups.store'), [
+    $this->post(route('staff.groups.store'), [
+        'group' => [
             'name'             => $group->name,
-            'slug'             => $group->slug,
             'position'         => $group->position,
             'level'            => $group->level,
             'color'            => $group->color,
             'icon'             => $group->icon,
             'effect'           => $group->effect,
+            'is_uploader'      => $group->is_uploader,
             'is_internal'      => $group->is_internal,
             'is_owner'         => $group->is_owner,
             'is_admin'         => $group->is_admin,
             'is_modo'          => $group->is_modo,
+            'is_torrent_modo'  => $group->is_torrent_modo,
+            'is_editor'        => $group->is_editor,
             'is_trusted'       => $group->is_trusted,
             'is_immune'        => $group->is_immune,
             'is_freeleech'     => $group->is_freeleech,
             'is_double_upload' => $group->is_double_upload,
+            'is_refundable'    => $group->is_refundable,
+            'can_chat'         => $group->can_chat,
+            'can_comment'      => $group->can_comment,
+            'can_invite'       => $group->can_invite,
+            'can_request'      => $group->can_request,
             'can_upload'       => $group->can_upload,
             'is_incognito'     => $group->is_incognito,
             'autogroup'        => $group->autogroup,
-        ]);
+        ],
+        'permissions' => [
+            [
+                'forum_id'    => $forum->id,
+                'read_topic'  => true,
+                'start_topic' => true,
+                'reply_topic' => true,
+            ],
+        ]
+    ])
+        ->assertRedirect(route('staff.groups.index'))
+        ->assertSessionHasNoErrors();
 
-        $response->assertRedirect(route('staff.groups.index'));
-    }
+    assertDatabaseHas('groups', [
+        'name'     => $group->name,
+        'position' => $group->position,
+    ]);
+});
 
-    /**
-     * @test
-     */
-    public function update_returns_an_ok_response()
-    {
-        $this->seed(GroupsTableSeeder::class);
+test('update validates with a form request', function (): void {
+    $this->assertActionUsesFormRequest(
+        GroupController::class,
+        'update',
+        UpdateGroupRequest::class
+    );
+});
 
-        $user = $this->createStaffUser();
-        $group = Group::factory()->create();
+test('update returns an ok response', function (): void {
+    $group = Group::factory()->create();
+    $forum = Forum::factory()->create();
 
-        $response = $this->actingAs($user)->post(route('staff.groups.update', ['id' => $group->id]), [
-            'name'             => $group->name,
-            'slug'             => $group->slug,
-            'position'         => $group->position,
-            'level'            => $group->level,
-            'color'            => $group->color,
-            'icon'             => $group->icon,
-            'effect'           => $group->effect,
-            'is_internal'      => $group->is_internal,
-            'is_owner'         => $group->is_owner,
-            'is_admin'         => $group->is_admin,
-            'is_modo'          => $group->is_modo,
-            'is_trusted'       => $group->is_trusted,
-            'is_immune'        => $group->is_immune,
-            'is_freeleech'     => $group->is_freeleech,
-            'is_double_upload' => $group->is_double_upload,
-            'can_upload'       => $group->can_upload,
-            'is_incognito'     => $group->is_incognito,
-            'autogroup'        => $group->autogroup,
-        ]);
+    $this->patch(route('staff.groups.update', ['group' => $group]), [
+        'group' => [
+            ...$group->toArray(),
+            'name'     => 'new name',
+            'position' => -2,
+            'level'    => 1000,
+        ],
+        'permissions' => [
+            [
+                'forum_id'    => $forum->id,
+                'read_topic'  => true,
+                'start_topic' => true,
+                'reply_topic' => true,
+            ],
+        ]
+    ])
+        ->assertRedirect(route('staff.groups.index'))
+        ->assertSessionHasNoErrors();
 
-        $response->assertRedirect(route('staff.groups.index'));
-    }
-}
+    assertDatabaseHas('groups', [
+        'name'     => 'new name',
+        'slug'     => 'new-name',
+        'position' => -2,
+        'level'    => 1000,
+    ]);
+
+    assertDatabaseHas('forum_permissions', [
+        'forum_id'    => $forum->id,
+        'read_topic'  => true,
+        'start_topic' => true,
+        'reply_topic' => true,
+    ]);
+});

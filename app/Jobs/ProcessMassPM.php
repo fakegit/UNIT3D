@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,6 +16,7 @@
 
 namespace App\Jobs;
 
+use App\Models\Conversation;
 use App\Models\PrivateMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,14 +26,6 @@ use Illuminate\Queue\SerializesModels;
 
 class ProcessMassPM implements ShouldQueue
 {
-    /**
-     * @var mixed
-     */
-    public $sender_id;
-    /**
-     * @var mixed
-     */
-    public $receiver_id;
     use Dispatchable;
     use InteractsWithQueue;
     use Queueable;
@@ -37,28 +33,24 @@ class ProcessMassPM implements ShouldQueue
 
     /**
      * ProcessMassPM Constructor.
-     *
-     * @param $sender_id
-     * @param $receiver_id
-     * @param $subject
-     * @param $message
      */
-    public function __construct(protected $senderId, protected $receiverId, protected $subject, protected $message)
+    public function __construct(protected int $senderId, protected int $receiverId, protected string $subject, protected string $message)
     {
     }
 
     /**
      * Execute the job.
-     *
-     * @return void
      */
-    public function handle()
+    public function handle(): void
     {
-        $privateMessage = new PrivateMessage();
-        $privateMessage->sender_id = $this->senderId;
-        $privateMessage->receiver_id = $this->receiverId;
-        $privateMessage->subject = $this->subject;
-        $privateMessage->message = $this->message;
-        $privateMessage->save();
+        $conversation = Conversation::create(['subject' => $this->subject]);
+
+        $conversation->users()->sync([$this->senderId => ['read' => true], $this->receiverId]);
+
+        PrivateMessage::create([
+            'conversation_id' => $conversation->id,
+            'sender_id'       => $this->senderId,
+            'message'         => $this->message
+        ]);
     }
 }

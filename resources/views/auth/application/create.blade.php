@@ -1,259 +1,182 @@
 <!DOCTYPE html>
 <html class="no-js" lang="{{ config('app.locale') }}">
+    <head>
+        <meta charset="utf-8" />
+        <title>Application - {{ config('other.title') }}</title>
+        <meta http-equiv="x-ua-compatible" content="ie=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="description" content="Application" />
+        <meta property="og:title" content="{{ __('auth.login') }}" />
+        <meta property="og:site_name" content="{{ config('other.title') }}" />
+        <meta property="og:type" content="website" />
+        <meta property="og:image" content="{{ url('/img/og.png') }}" />
+        <meta property="og:description" content="{{ config('unit3d.powered-by') }}" />
+        <meta property="og:url" content="{{ url('/') }}" />
+        <meta property="og:locale" content="{{ config('app.locale') }}" />
+        <meta name="csrf-token" content="{{ csrf_token() }}" />
+        <link rel="shortcut icon" href="{{ url('/favicon.ico') }}" type="image/x-icon" />
+        <link rel="icon" href="{{ url('/favicon.ico') }}" type="image/x-icon" />
+        @vite('resources/sass/pages/_auth.scss')
+    </head>
+    <body>
+        <main x-data="{ proofs: 2 }">
+            <section class="auth-form">
+                <form
+                    class="auth-form__form"
+                    method="POST"
+                    action="{{ route('application.store') }}"
+                >
+                    @csrf
+                    <a class="auth-form__branding" href="{{ route('home.index') }}">
+                        <i class="fal fa-tv-retro"></i>
+                        <span class="auth-form__site-logo">{{ \config('other.title') }}</span>
+                    </a>
+                    @if (config('other.application_signups'))
+                        <ul class="auth-form__important-infos">
+                            <li class="auth-form__important-info">
+                                {{ config('other.title') }} {{ __('auth.appl-intro') }}
+                            </li>
+                            @if (Session::has('warning'))
+                                <li class="auth-form__important-info">
+                                    Warning: {{ Session::get('warning') }}
+                                </li>
+                            @endif
 
-<head>
-    <meta charset="utf-8">
-    <title>Application - {{ config('other.title') }}</title>
+                            @if (Session::has('info'))
+                                <li class="auth-form__important-info">
+                                    Info: {{ Session::get('info') }}
+                                </li>
+                            @endif
 
-    <meta http-equiv="x-ua-compatible" content="ie=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Application">
-    <meta property="og:title" content="@lang('auth.login')">
-    <meta property="og:site_name" content="{{ config('other.title') }}">
-    <meta property="og:type" content="website">
-    <meta property="og:image" content="{{ url('/img/og.png') }}">
-    <meta property="og:description" content="{{ config('unit3d.powered-by') }}">
-    <meta property="og:url" content="{{ url('/') }}">
-    <meta property="og:locale" content="{{ config('app.locale') }}">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
+                            @if (Session::has('success'))
+                                <li class="auth-form__important-info">
+                                    Success: {{ Session::get('success') }}
+                                </li>
+                            @endif
+                        </ul>
+                        <p class="auth-form__select-group">
+                            <label for="type" class="auth-form__label">
+                                {{ __('auth.are-you') }}
+                            </label>
+                            <select
+                                id="type"
+                                class="auth-form__select"
+                                name="application[type]"
+                                required
+                            >
+                                <option class="auth-form__option" value="New to the game" selected>
+                                    {{ __('auth.newbie') }}
+                                </option>
+                                <option
+                                    class="auth-form__option"
+                                    value="Experienced with private trackers"
+                                >
+                                    {{ __('auth.veteran') }}
+                                </option>
+                            </select>
+                        </p>
+                        <p class="auth-form__text-input-group">
+                            <label for="email" class="auth-form__label">
+                                {{ __('auth.email') }}
+                            </label>
+                            <input
+                                id="email"
+                                type="email"
+                                class="auth-form__text-input"
+                                name="application[email]"
+                                required
+                            />
+                        </p>
+                        <p class="auth-form__textarea-group">
+                            <label for="referrer" class="auth-form__label">
+                                {{ __('auth.appl-reason', ['sitename' => config('other.title')]) }}
+                            </label>
+                            <textarea
+                                id="referrer"
+                                type="referrer"
+                                class="auth-form__textarea"
+                                name="application[referrer]"
+                                required
+                            ></textarea>
+                        </p>
+                        <label class="auth-form__label">Proofs</label>
+                        <template x-for="proof in proofs">
+                            <fieldset class="auth-form__fieldset">
+                                <legend
+                                    class="auth-form__legend"
+                                    x-text="'Proof ' + proof"
+                                ></legend>
+                                <p class="auth-form__text-input-group">
+                                    <label
+                                        class="auth-form__label"
+                                        x-bind:for="'image' + (proof - 1)"
+                                    >
+                                        {{ __('auth.proof-image') }}
+                                    </label>
+                                    <input
+                                        x-bind:id="'image' + (proof - 1)"
+                                        class="auth-form__text-input"
+                                        x-bind:name="'images[' + (proof - 1) + '][image]'"
+                                        type="url"
+                                        placeholder=" "
+                                        required
+                                    />
+                                </p>
+                                <p class="auth-form__text-input-group">
+                                    <label
+                                        class="auth-form__label"
+                                        x-bind:for="'profile' + (proof - 1)"
+                                    >
+                                        {{ __('auth.proof-profile') }}
+                                    </label>
+                                    <input
+                                        x-bind:id="'profile' + (proof - 1)"
+                                        class="auth-form__text-input"
+                                        x-bind:name="'links[' + (proof - 1) + '][url]'"
+                                        type="url"
+                                        placeholder=" "
+                                    />
+                                </p>
+                            </fieldset>
+                        </template>
+                        <p class="auth-form__button-container">
+                            <button
+                                x-on:click.prevent="proofs++"
+                                class="auth-form__button--text"
+                                type="button"
+                            >
+                                {{ __('common.add') }}
+                            </button>
+                            <button
+                                class="auth-form__button--text"
+                                x-on:click.prevent="proofs = Math.max(2, proofs - 1)"
+                                type="button"
+                            >
+                                {{ __('common.delete') }}
+                            </button>
+                        </p>
+                        @if (config('captcha.enabled'))
+                            @hiddencaptcha
+                        @endif
 
-    <link rel="shortcut icon" href="{{ url('/favicon.ico') }}" type="image/x-icon">
-    <link rel="icon" href="{{ url('/favicon.ico') }}" type="image/x-icon">
-
-    <link rel="stylesheet" href="{{ mix('css/app.css') }}" crossorigin="anonymous">
-</head>
-
-<body>
-    @if ($errors->any())
-        <div id="ERROR_COPY" style="display: none;">
-            @foreach ($errors->all() as $error)
-                {{ $error }}<br>
-            @endforeach
-        </div>
-    @endif
-    <br>
-    @if(config('other.application_signups') == true)
-        <div class="container">
-            <div class="block">
-                <div class="row">
-                    <div class="col-md-8 col-md-offset-2">
-                        <div class="panel panel-chat shoutbox">
-                            <div class="header gradient blue">
-                                <div class="inner_content">
-                                    <h1>
-                                        @lang('auth.application')
-                                    </h1>
-                                </div>
-                            </div>
-                            <div class="panel-body">
-                                <div class="alert alert-info text-center">
-                                    {{ config('other.title') }} @lang('auth.appl-intro')
-                                </div>
-                                <hr>
-
-                                <form role="form" method="POST" action="{{ route('application.store') }}">
-                                    @csrf
-
-                                    <label for="type" class="control-label">@lang('auth.are-you')</label>
-                                    <br>
-                                    <div class="radio-inline">
-                                        <label>
-                                            <input type="radio" name="type" value="New To The Game" checked>
-                                            @lang('auth.newbie')
-                                        </label>
-                                    </div>
-                                    <div class="radio-inline">
-                                        <label>
-                                            <input type="radio" name="type" value="Experienced With Private Trackers">
-                                            @lang('auth.veteran')
-                                        </label>
-                                    </div>
-
-                                    <hr>
-
-                                    <div class="form-group">
-                                        <label for="email" class="control-label">@lang('auth.email')</label>
-                                        <input id="email" type="email" class="form-control" name="email" required>
-                                       @if (config('email-white-blacklist.enabled') == 'block')
-                                            <br>
-                                            <a target="_blank" rel="noopener noreferrer" href="{{ route('public.email') }}">
-                                                @lang('common.email-blacklist')
-                                            </a>
-                                       @elseif (config('email-white-blacklist.enabled') == 'allow')
-                                            <br>
-                                            <a target="_blank" rel="noopener noreferrer" href="{{ route('public.email') }}">
-                                                @lang('common.email-whitelist')
-                                            </a>
-                                       @endif
-                                    </div>
-
-                                    <hr>
-
-                                    <div class="form-group">
-                                        <strong>@lang('auth.proof-image-title')</strong><br>
-                                        @lang('auth.proof-min')<br>
-                                        <label for="image1">@lang('auth.proof-image') 1:</label>
-                                        <label>
-                                            <input type="text" name="images[]" class="form-control" value="">
-                                        </label>
-                                    </div>
-
-                                    <div class="form-group">
-                                        <label for="image2">@lang('auth.proof-image') 2:</label>
-                                        <label>
-                                            <input type="text" name="images[]" class="form-control" value="">
-                                        </label>
-                                    </div>
-
-                                    <div class="more-images"></div>
-
-                                    <div class="form-group">
-                                        <button id="addImg" class="btn btn-primary">@lang('auth.add-image')</button>
-                                        <button id="delImg" class="btn btn-primary">@lang('auth.delete-image')</button>
-                                    </div>
-
-                                    <hr>
-
-                                    <div class="form-group">
-                                        <strong>@lang('auth.proof-profile-title')</strong><br>
-                                        @lang('auth.proof-min')<br>
-                                        <label for="link1">@lang('auth.proof-profile') 1:</label>
-                                        <label>
-                                            <input type="text" name="links[]" class="form-control" value="">
-                                        </label>
-                                    </div>
-
-                                    <div class="form-group">
-                                        <label for="link2">@lang('auth.proof-profile') 2:</label>
-                                        <label>
-                                            <input type="text" name="links[]" class="form-control" value="">
-                                        </label>
-                                    </div>
-
-                                    <div class="more-links"></div>
-
-                                    <div class="form-group">
-                                        <button id="addLink" class="btn btn-primary">@lang('auth.add-profile')</button>
-                                        <button id="delLink" class="btn btn-primary">@lang('auth.delete-profile')</button>
-                                    </div>
-
-                                    <hr>
-
-                                    <div class="form-group">
-                                        <label for="referrer">@lang('auth.appl-reason',['sitename' =>
-                                            config('other.title')])<span class="badge-extra">BBCode
-                                                @lang('common.is-allowed')</span></label>
-                                        <label>
-                                            <textarea name="referrer" cols="30" rows="10" maxlength="500" class="form-control"></textarea>
-                                        </label>
-                                    </div>
-
-                                    @if (config('captcha.enabled') == true)
-                                        @hiddencaptcha
-                                    @endif
-
-                                    <div class="form-group">
-                                        <div class="text-center">
-                                            <button type="submit" class="btn btn-primary">
-                                                @lang('common.submit')
-                                            </button>
-                                        </div>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <br>
-
-        <script src="{{ mix('js/app.js') }}" crossorigin="anonymous"></script>
-
-        <script nonce="{{ Bepsvpt\SecureHeaders\SecureHeaders::nonce('script') }}">
-            let images = 2
-
-            $('#addImg').on('click', function(e) {
-                e.preventDefault();
-                images += 1;
-                const imageHTML = '<div class="form-group extra-image"><label for="image' + images +
-                        '">Proof Image URL ' + images +
-                        ':</label><input type="text" name="images[]" class="form-control" value="" required></div>'
-                $('.more-images').append(imageHTML);
-            });
-
-            $('#delImg').on('click', function(e) {
-                e.preventDefault();
-                images = (images > 2) ? images - 1 : 2;
-                $('.extra-image').last().remove();
-            });
-
-        </script>
-
-        <script nonce="{{ Bepsvpt\SecureHeaders\SecureHeaders::nonce('script') }}">
-            let links = 2
-
-            $('#addLink').on('click', function(e) {
-                e.preventDefault();
-                links += 1;
-                const linkHTML = '<div class="form-group extra-link"><label for="link' + links +
-                        '">Profile Link URL ' + links +
-                        ':</label><input type="text" name="links[]" class="form-control" value="" required></div>'
-                $('.more-links').append(linkHTML);
-            });
-
-            $('#delLink').on('click', function(e) {
-                e.preventDefault();
-                links = (links > 2) ? links - 1 : 2;
-                $('.extra-link').last().remove();
-            });
-
-        </script>
-
-        @foreach (['warning', 'success', 'info'] as $key)
-            @if (Session::has($key))
-                <script nonce="{{ Bepsvpt\SecureHeaders\SecureHeaders::nonce('script') }}">
-                    const Toast = Swal.mixin({
-                        toast: true,
-                        position: 'top-end',
-                        showConfirmButton: false,
-                        timer: 3000
-                    });
-
-                    Toast.fire({
-                        icon: '{{ $key }}',
-                        title: '{{ Session::get($key) }}'
-                    })
-
-                </script>
-            @endif
-        @endforeach
-
-        @if (Session::has('errors'))
-            <script nonce="{{ Bepsvpt\SecureHeaders\SecureHeaders::nonce('script') }}">
-                Swal.fire({
-                    title: '<strong style=" color: rgb(17,17,17);">Error</strong>',
-                    icon: 'error',
-                    html: jQuery("#ERROR_COPY").html(),
-                    showCloseButton: true,
-                })
-
-            </script>
-        @endif
-
-    @else
-        <div class="container">
-            <div class="jumbotron shadowed">
-                <div class="container">
-                    <h1 class="mt-5 text-center">
-                        <i class="{{ config('other.font-awesome') }} fa-times text-danger"></i>@lang('auth.appl-closed')
-                    </h1>
-                    <div class="separator"></div>
-                    <p class="text-center">@lang('auth.check-later')</p>
-                </div>
-            </div>
-        </div>
-    @endif
-</body>
-
+                        <button class="auth-form__primary-button">{{ __('auth.apply') }}</button>
+                        @if (Session::has('errors'))
+                            <ul class="auth-form__errors">
+                                @foreach ($errors->all() as $error)
+                                    <li class="auth-form__error">{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        @endif
+                    @else
+                        <ul class="auth-form__important-infos">
+                            <li class="auth-form__important-info">{{ __('auth.appl-closed') }}</li>
+                            <li class="auth-form__important-info">{{ __('auth.check-later') }}</li>
+                        </ul>
+                    @endif
+                </form>
+            </section>
+        </main>
+        @vite('resources/js/app.js')
+        @livewireScriptConfig(['nonce' => HDVinnie\SecureHeaders\SecureHeaders::nonce()])
+    </body>
 </html>

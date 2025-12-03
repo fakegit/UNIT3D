@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,7 +19,9 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Notifications\Notifiable;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Chatroom.
@@ -25,53 +30,41 @@ use Illuminate\Notifications\Notifiable;
  * @property string                          $name
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Message[] $messages
- * @property-read int|null $messages_count
- * @property-read \Illuminate\Notifications\DatabaseNotificationCollection|\Illuminate\Notifications\DatabaseNotification[] $notifications
- * @property-read int|null $notifications_count
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\User[] $users
- * @property-read int|null $users_count
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Chatroom newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Chatroom newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Chatroom query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Chatroom whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Chatroom whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Chatroom whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Chatroom whereUpdatedAt($value)
- * @mixin \Eloquent
  */
-class Chatroom extends Model
+#[AllowDynamicProperties]
+final class Chatroom extends Model
 {
-    use HasFactory;
-    use Notifiable;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\ChatroomFactory> */
+    use HasFactory;
+    use Notifiable;
+
     /**
-     * The Attributes That Are Mass Assignable.
+     * The attributes that are mass assignable.
      *
-     * @var array
+     * @var list<string>
      */
     protected $fillable = [
         'name',
     ];
 
     /**
-     * A User Has Many Messages.
+     * Get the messages in the chat room.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<Message, $this>
      */
-    public function messages()
+    public function messages(): HasMany
     {
         return $this->hasMany(Message::class);
     }
 
     /**
-     * A Chat Room Has Many Users.
+     * Get the users in the chat room.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<User, $this>
      */
-    public function users()
+    public function users(): HasMany
     {
         return $this->hasMany(User::class);
     }

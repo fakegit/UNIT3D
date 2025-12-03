@@ -1,7 +1,10 @@
 <?php
 
-return [
+declare(strict_types=1);
 
+use App\Enums\AuthGuard;
+
+return [
     /*
     |--------------------------------------------------------------------------
     | Authentication Defaults
@@ -14,7 +17,7 @@ return [
     */
 
     'defaults' => [
-        'guard'     => 'web',
+        'guard'     => AuthGuard::WEB->value,
         'passwords' => 'users',
     ],
 
@@ -31,20 +34,24 @@ return [
     | users are actually retrieved out of your database or other storage
     | mechanisms used by this application to persist your user's data.
     |
-    | Supported: "session", "token"
+    | Supported: "session"
     |
     */
 
     'guards' => [
-        'web' => [
+        AuthGuard::WEB->value => [
             'driver'   => 'session',
             'provider' => 'users',
         ],
 
-        'api' => [
+        AuthGuard::API->value => [
             'driver'   => 'token',
             'provider' => 'users',
             'hash'     => false,
+        ],
+
+        'rss' => [
+            'driver' => 'rsskey',
         ],
     ],
 
@@ -67,7 +74,7 @@ return [
 
     'providers' => [
         'users' => [
-            'driver' => 'eloquent',
+            'driver' => 'cache-user',
             'model'  => App\Models\User::class,
         ],
 
@@ -86,16 +93,20 @@ return [
     | than one user table or model in the application and you want to have
     | separate password reset settings based on the specific user types.
     |
-    | The expire time is the number of minutes that the reset token should be
+    | The expire time is the number of minutes that each reset token will be
     | considered valid. This security feature keeps tokens short-lived so
     | they have less time to be guessed. You may change this as needed.
+    |
+    | The throttle setting is the number of seconds a user must wait before
+    | generating more password reset tokens. This prevents the user from
+    | quickly generating a very large amount of password reset tokens.
     |
     */
 
     'passwords' => [
         'users' => [
             'provider' => 'users',
-            'table'    => 'password_resets',
+            'table'    => 'password_reset_tokens',
             'expire'   => 60,
             'throttle' => 60,
         ],
@@ -114,18 +125,17 @@ return [
 
     'password_timeout' => 10800,
 
-    'TwoStepEnabled' => true,
-
-    'verificationEmailFrom'     => env('MAIL_FROM_ADDRESS', env('MAIL_FROM_NAME')),
-
-    'verificationEmailFromName' => ' 2-Step Verification',
-
-    'TwoStepExceededCount'             => 3,
-
-    'TwoStepExceededCountdownMinutes'  => 60 * 24,
-
-    'TwoStepVerifiedLifetimeMinutes'   => 6 * 60,
-
-    'TwoStepTimeResetBufferSeconds'    => 6 * 60,
-
+    /*
+    |--------------------------------------------------------------------------
+    | Email Verification Timeout
+    |--------------------------------------------------------------------------
+    |
+    | Here you may define the amount of minutes before an email verification
+    | times out and the user is prompted to re-verify their email via the
+    | verify screen. By default, the timeout lasts for one day.
+    |
+    */
+    'verification' => [
+        'expire' => 1440,
+    ],
 ];

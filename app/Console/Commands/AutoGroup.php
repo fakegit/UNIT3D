@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,16 +16,14 @@
 
 namespace App\Console\Commands;
 
-use App\Helpers\ByteUnits;
+use App\Enums\UserGroup;
 use App\Models\Group;
-use App\Models\History;
 use App\Models\User;
-use Carbon\Carbon;
+use App\Services\Unit3dAnnounce;
+use Exception;
 use Illuminate\Console\Command;
+use Throwable;
 
-/**
- * @see \Tests\Unit\Console\Commands\AutoGroupTest
- */
 class AutoGroup extends Command
 {
     /**
@@ -30,84 +31,83 @@ class AutoGroup extends Command
      *
      * @var string
      */
-    protected $signature = 'auto:group';
+    protected $signature = 'auto:group {user_ids?*}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Automatically Change A Users Group Class If Requirements Met';
+    protected $description = 'Automatically change a users group class if requirements met';
 
     /**
      * Execute the console command.
      *
-     *
-     * @return mixed
+     * @throws Exception|Throwable If there is an error during the execution of the command.
      */
-    public function handle(ByteUnits $byteUnits)
+    final public function handle(): void
     {
-        // Temp Hard Coding of Immune Groups (Config Files To Come)
-        $current = Carbon::now();
-        $groups = Group::select(['id'])->where('autogroup', '=', 1)->get()->toArray();
-        foreach (User::whereIn('group_id', $groups)->get() as $user) {
-            $hiscount = History::where('user_id', '=', $user->id)->count();
+        $now = now();
+        $timestamp = $now->timestamp;
 
-            // Temp Hard Coding of Group Requirements (Config Files To Come) (Upload in Bytes!) (Seedtime in Seconds!)
+        $groups = Group::query()
+            ->where('autogroup', '=', 1)
+            ->orderByDesc('position')
+            ->get();
 
-            // Leech ratio dropped below sites minimum
-            if ($user->getRatio() < \config('other.ratio') && $user->group_id != 15) {
-                $user->group_id = 15;
-                $user->can_request = 0;
-                $user->can_invite = 0;
-                $user->can_download = 0;
-                $user->save();
-            }
-            // User >= 0 and ratio above sites minimum
-            if ($user->uploaded >= 0 && $user->getRatio() >= \config('other.ratio') && $user->group_id != 3) {
-                $user->group_id = 3;
-                $user->can_request = 1;
-                $user->can_invite = 1;
-                $user->can_download = 1;
-                $user->save();
-            }
+        $userIds = array_map('intval', (array) $this->argument('user_ids'));
 
-            // PowerUser >= 1TiB and account 1 month old
-            if ($user->uploaded >= $byteUnits->bytesFromUnit('1TiB') && $user->getRatio() >= \config('other.ratio') && $user->created_at < $current->copy()->subDays(30)->toDateTimeString() && $user->group_id != 11) {
-                $user->group_id = 11;
-                $user->save();
-            }
-            // SuperUser >= 5TiB and account 2 month old
-            if ($user->uploaded >= $byteUnits->bytesFromUnit('5TiB') && $user->getRatio() >= \config('other.ratio') && $user->created_at < $current->copy()->subDays(60)->toDateTimeString() && $user->group_id != 12) {
-                $user->group_id = 12;
-                $user->save();
-            }
-            // ExtremeUser >= 20TiB and account 3 month old
-            if ($user->uploaded >= $byteUnits->bytesFromUnit('20TiB') && $user->getRatio() >= \config('other.ratio') && $user->created_at < $current->copy()->subDays(90)->toDateTimeString() && $user->group_id != 13) {
-                $user->group_id = 13;
-                $user->save();
-            }
-            // InsaneUser >= 50TiB and account 6 month old
-            if ($user->uploaded >= $byteUnits->bytesFromUnit('50TiB') && $user->getRatio() >= \config('other.ratio') && $user->created_at < $current->copy()->subDays(180)->toDateTimeString() && $user->group_id != 14) {
-                $user->group_id = 14;
-                $user->save();
-            }
-            // Seeder Seedsize >= 5TiB and account 1 month old and seedtime average 30 days or better
-            if ($user->getTotalSeedSize() >= $byteUnits->bytesFromUnit('5TiB') && $user->getRatio() >= \config('other.ratio') && \round($user->getTotalSeedTime() / \max(1, $hiscount)) > 2_592_000 && $user->created_at < $current->copy()->subDays(30)->toDateTimeString() && $user->group_id != 17) {
-                $user->group_id = 17;
-                $user->save();
-            }
-            // Veteran >= 100TiB and account 1 year old
-            if ($user->uploaded >= $byteUnits->bytesFromUnit('100TiB') && $user->getRatio() >= \config('other.ratio') && $user->created_at < $current->copy()->subDays(365)->toDateTimeString() && $user->group_id != 16) {
-                $user->group_id = 16;
-                $user->save();
-            }
-            // Archivist Seedsize >= 10TiB and account 3 month old and seedtime average 60 days or better
-            if ($user->getTotalSeedSize() >= $byteUnits->bytesFromUnit('10TiB') && $user->getRatio() >= \config('other.ratio') && \round($user->getTotalSeedTime() / \max(1, $hiscount)) > 2_592_000 * 2 && $user->created_at < $current->copy()->subDays(90)->toDateTimeString() && $user->group_id != 18) {
-                $user->group_id = 18;
-                $user->save();
-            }
+        $userQuery = User::query()
+            ->withSum('seedingTorrents as seedsize', 'size')
+            ->withCount([
+                'torrents as uploads',
+                'warnings' => fn ($query) => $query->where('active', '=', true),
+            ])
+            ->withAvg('history as avg_seedtime', 'seedtime');
+
+        if ($userIds !== []) {
+            $userQuery->whereIntegerInRaw('id', $userIds);
+        } else {
+            $userQuery->whereIntegerInRaw('group_id', $groups->pluck('id'));
         }
-        $this->comment('Automated User Group Command Complete');
+
+        $userQuery->chunkById(100, function ($users) use ($groups, $timestamp): void {
+            foreach ($users as $user) {
+                foreach ($groups as $group) {
+                    if (
+                        ($group->min_uploaded === null || $user->uploaded >= $group->min_uploaded)
+                        && ($group->min_ratio === null || $user->ratio >= $group->min_ratio)
+                        && ($group->min_age === null || $timestamp - $user->created_at->timestamp >= $group->min_age)
+                        && ($group->min_avg_seedtime === null || $user->avg_seedtime >= $group->min_avg_seedtime)
+                        && ($group->min_seedsize === null || $user->seedsize >= $group->min_seedsize)
+                        && ($group->min_uploads === null || $user->uploads >= $group->min_uploads)
+                    ) {
+                        $user->group_id = $group->id;
+
+                        // Leech ratio dropped below sites minimum
+                        if ($user->group_id === UserGroup::LEECH->value) {
+                            // Keep these as 0/1 instead of false/true
+                            // because it reduces 6% custom casting overhead
+                            $user->can_download = 0;
+                        } elseif ($user->warnings_count < config('hitrun.max_warnings')) {
+                            $user->can_download = 1;
+                        }
+
+                        $user->save();
+
+                        if ($user->wasChanged()) {
+                            cache()->forget('user:'.$user->passkey);
+
+                            Unit3dAnnounce::addUser($user);
+                        }
+
+                        break;
+                    }
+                }
+            }
+        });
+
+        $elapsed = (int) $now->diffInSeconds(now(), true);
+        $this->comment('Automated user group command complete ('.$elapsed.' s)');
     }
 }

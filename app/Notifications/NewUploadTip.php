@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,7 +16,7 @@
 
 namespace App\Notifications;
 
-use App\Models\Torrent;
+use App\Models\TorrentTip;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -24,21 +27,17 @@ class NewUploadTip extends Notification implements ShouldQueue
 
     /**
      * NewUploadTip Constructor.
-     *
-     * @param $amount
      */
-    public function __construct(public string $type, public string $tipper, public $amount, public Torrent $torrent)
+    public function __construct(public TorrentTip $tip)
     {
     }
 
     /**
      * Get the notification's delivery channels.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<int, string>
      */
-    public function via($notifiable)
+    public function via(object $notifiable): array
     {
         return ['database'];
     }
@@ -46,16 +45,16 @@ class NewUploadTip extends Notification implements ShouldQueue
     /**
      * Get the array representation of the notification.
      *
-     * @param mixed $notifiable
-     *
-     * @return array
+     * @return array<string, mixed>
      */
-    public function toArray($notifiable)
+    public function toArray(object $notifiable): array
     {
+        $this->tip->load('sender');
+
         return [
-            'title' => $this->tipper.' Has Tipped You '.$this->amount.' BON For An Uploaded Torrent',
-            'body'  => $this->tipper.' has tipped one of your Uploaded Torrents '.$this->torrent->name,
-            'url'   => \sprintf('/torrents/%s', $this->torrent->id),
+            'title' => $this->tip->sender->username.' Has Tipped You '.$this->tip->bon.' BON For An Uploaded Torrent',
+            'body'  => $this->tip->sender->username.' has tipped one of your Uploaded Torrents '.$this->tip->torrent->name,
+            'url'   => \sprintf('/torrents/%s', $this->tip->torrent_id),
         ];
     }
 }

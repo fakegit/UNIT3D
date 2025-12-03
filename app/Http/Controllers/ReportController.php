@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -25,116 +28,91 @@ use Illuminate\Http\Request;
 class ReportController extends Controller
 {
     /**
-     * ReportController Constructor.
-     */
-    public function __construct(private Report $report)
-    {
-    }
-
-    /**
      * Create A Request Report.
-     *
-     * @param \App\Models\TorrentRequest $id
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function request(Request $request, $id)
+    public function request(Request $request, int $id): \Illuminate\Http\RedirectResponse
     {
         $torrentRequest = TorrentRequest::findOrFail($id);
         $reportedBy = $request->user();
         $reportedUser = $torrentRequest->user;
 
-        $v = \validator($request->all(), [
-            'message' => 'required',
+        $request->validate([
+            'message' => [
+                'required',
+                'max:65535',
+            ],
         ]);
 
-        if ($v->fails()) {
-            return \redirect()->route('request', ['id' => $id])
-                ->withErrors($v->errors());
-        }
-        $this->report->create([
-            'type'          => 'Request',
-            'request_id'    => $torrentRequest->id,
-            'torrent_id'    => 0,
-            'reporter_id'   => $reportedBy->id,
-            'reported_user' => $reportedUser->id,
-            'title'         => $torrentRequest->name,
-            'message'       => $request->get('message'),
-            'solved'        => 0,
+        Report::create([
+            'type'                => 'Request',
+            'reported_request_id' => $torrentRequest->id,
+            'reported_torrent_id' => null,
+            'reporter_id'         => $reportedBy->id,
+            'reported_user_id'    => $reportedUser->id,
+            'title'               => $torrentRequest->name,
+            'message'             => $request->string('message'),
         ]);
 
-        return \redirect()->route('request', ['id' => $id])
-            ->withSuccess('Your report has been successfully sent');
+        return to_route('requests.show', ['torrentRequest' => $torrentRequest])
+            ->with('success', trans('user.report-sent'));
     }
 
     /**
      * Create A Torrent Report.
-     *
-     * @param \App\Models\Torrent $id
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function torrent(Request $request, $id)
+    public function torrent(Request $request, int $id): \Illuminate\Http\RedirectResponse
     {
         $torrent = Torrent::findOrFail($id);
         $reportedBy = $request->user();
         $reportedUser = $torrent->user;
 
-        $v = \validator($request->all(), [
-            'message' => 'required',
+        $request->validate([
+            'message' => [
+                'required',
+                'max:65535',
+            ],
         ]);
 
-        if ($v->fails()) {
-            return \redirect()->route('torrent', ['id' => $id])
-                ->withErrors($v->errors());
-        }
-        $this->report->create([
-            'type'          => 'Torrent',
-            'torrent_id'    => $torrent->id,
-            'request_id'    => 0,
-            'reporter_id'   => $reportedBy->id,
-            'reported_user' => $reportedUser->id,
-            'title'         => $torrent->name,
-            'message'       => $request->get('message'),
-            'solved'        => 0,
+        Report::create([
+            'type'                => 'Torrent',
+            'reported_torrent_id' => $torrent->id,
+            'reported_request_id' => null,
+            'reporter_id'         => $reportedBy->id,
+            'reported_user_id'    => $reportedUser->id,
+            'title'               => $torrent->name,
+            'message'             => $request->string('message'),
         ]);
 
-        return \redirect()->route('torrent', ['id' => $id])
-            ->withSuccess('Your report has been successfully sent');
+        return to_route('torrents.show', ['id' => $id])
+            ->with('success', trans('user.report-sent'));
     }
 
     /**
      * Create A User Report.
-     *
-     * @param \App\Models\User $username
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function user(Request $request, $username)
+    public function user(Request $request, string $username): \Illuminate\Http\RedirectResponse
     {
-        $reportedUser = User::where('username', '=', $username)->firstOrFail();
+        $reportedUser = User::where('username', '=', $username)->sole();
         $reportedBy = $request->user();
 
-        $v = \validator($request->all(), [
-            'message' => 'required',
+        $request->validate([
+            'message' => [
+                'required',
+                'max:65535',
+            ],
         ]);
 
-        if ($v->fails()) {
-            return \redirect()->route('users.show', ['username' => $username])
-                ->withErrors($v->errors());
-        }
-        $this->report->create([
-            'type'          => 'User',
-            'torrent_id'    => 0,
-            'request_id'    => 0,
-            'reporter_id'   => $reportedBy->id,
-            'reported_user' => $reportedUser->id,
-            'title'         => $reportedUser->username,
-            'message'       => $request->get('message'),
-            'solved'        => 0,
+        Report::create([
+            'type'                => 'User',
+            'reported_torrent_id' => null,
+            'reported_request_id' => null,
+            'reporter_id'         => $reportedBy->id,
+            'reported_user_id'    => $reportedUser->id,
+            'title'               => $reportedUser->username,
+            'message'             => $request->string('message'),
         ]);
 
-        return \redirect()->route('users.show', ['username' => $username])
-            ->withSuccess('Your report has been successfully sent');
+        return to_route('users.show', ['user' => $reportedUser])
+            ->with('success', trans('user.report-sent'));
     }
 }

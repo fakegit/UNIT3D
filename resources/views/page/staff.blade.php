@@ -1,39 +1,54 @@
-@extends('layout.default')
+@extends('layout.with-main-and-sidebar')
 
-@section('breadcrumb')
-    <li>
-        <a href="{{ route('staff') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">{{ config('other.title') }}
-                @lang('common.staff')</span>
-        </a>
-    </li>
+@section('breadcrumbs')
+    <li class="breadcrumb--active">{{ config('other.title') }} {{ __('common.staff') }}</li>
 @endsection
 
-@section('content')
-    <div class="container box">
-        <div class="col-md-12 page">
-            <div class="header gradient red">
-                <div class="inner_content">
-                    <div class="page-title">
-                        <h1>{{ config('other.title') }} @lang('common.staff')</h1>
-                    </div>
-                </div>
-            </div>
-            <div class="row oper-list">
-                @foreach ($staff as $s)
-                    <div class="col-xs-6 col-sm-4 col-md-3">
-                        <div class="text-center oper-item" style="background-color: {{ $s->color }};">
-                            <a href="{{ route('users.show', ['username' => $s->username]) }}" style="color:#ffffff;">
-                                <h1>{{ $s->username }}</h1>
-                            </a>
-                            <span class="badge-user">@lang('page.staff-group'): {{ $s->name }}</span>
-                            <br>
-                            <span class="badge-user">@lang('page.staff-title'): {{ $s->title }}</span>
-                            <i class="{{ $s->icon }} oper-icon"></i>
-                        </div>
-                    </div>
+@section('page', 'page__staff--index')
+
+@section('main')
+    @foreach ($staff as $group)
+        <section class="panelV2">
+            <h2 class="panel__heading">{{ $group->name }}</h2>
+            <div class="panel__body user-card-wrapper">
+                @foreach ($group->users as $user)
+                    <a
+                        href="{{ route('users.show', ['user' => $user]) }}"
+                        class="user-card"
+                        style="
+                            background-color: {{ $user->group->color }};
+                            background-image: {{ $group->effect }};
+                        "
+                    >
+                        <h3 class="user-card__username">
+                            {{ $user->username }}
+                        </h3>
+                        <i class="fal {{ $user->group->icon }} user-card__icon"></i>
+                        @if ($user->title !== null)
+                            <p class="user-card__title">
+                                {{ __('page.staff-title') }}: {{ $user->title }}
+                            </p>
+                        @endif
+                    </a>
                 @endforeach
             </div>
+        </section>
+    @endforeach
+@endsection
+
+@section('sidebar')
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ __('common.info') }}</h2>
+        <div class="panel__body">Please contact staff via the helpdesk for account support.</div>
+        <div class="panel__body">
+            <p class="form__group form__group--horizontal">
+                <a
+                    class="form__button form__button--filled form__button--centered"
+                    href="{{ route('tickets.index') }}"
+                >
+                    Open helpdesk
+                </a>
+            </p>
         </div>
-    </div>
+    </section>
 @endsection

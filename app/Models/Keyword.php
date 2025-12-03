@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,23 +16,48 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use AllowDynamicProperties;
 
-class Keyword extends Model
+/**
+ * App\Models\Keyword.
+ *
+ * @property int         $id
+ * @property string      $name
+ * @property int         $torrent_id
+ * @property string|null $created_at
+ * @property string|null $updated_at
+ */
+#[AllowDynamicProperties]
+final class Keyword extends Model
 {
+    /** @use HasFactory<\Database\Factories\KeywordFactory> */
+    use HasFactory;
+
     /**
-     * Indicates If The Model Should Be Timestamped.
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
+    protected $fillable = [
+        'name',
+    ];
+
+    /**
+     * Indicates if the model should be timestamped.
      *
      * @var bool
      */
     public $timestamps = false;
 
     /**
-     * Belongs To Many Torrents.
+     * Get the torrents that have this keyword.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
+     * @return BelongsToMany<Torrent, $this>
      */
-    public function torrents()
+    public function torrents(): BelongsToMany
     {
         return $this->belongsToMany(Torrent::class);
     }

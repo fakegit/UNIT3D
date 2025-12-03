@@ -1,59 +1,85 @@
-@extends('layout.default')
+@extends('layout.with-main-and-sidebar')
 
 @section('title')
-    <title>@lang('common.contact') - {{ config('other.title') }}</title>
+    <title>{{ __('common.contact') }} - {{ config('other.title') }}</title>
 @endsection
 
 @section('meta')
-    <meta name="description" content="@lang('common.contact') {{ config('other.title') }}.">
+    <meta name="description" content="{{ __('common.contact') }} {{ config('other.title') }}." />
 @endsection
 
-@section('breadcrumb')
-    <li>
-        <a href="{{ route('contact.index') }}" itemprop="url" class="l-breadcrumb-item-link">
-            <span itemprop="title" class="l-breadcrumb-item-link-title">@lang('common.contact')</span>
+@section('breadcrumbs')
+    <li class="breadcrumbV2">
+        <a href="{{ route('about') }}" class="breadcrumb__link">
+            {{ __('common.about') }}
         </a>
+    </li>
+    <li class="breadcrumb--active">
+        {{ __('common.contact') }}
     </li>
 @endsection
 
-@section('content')
-    <div class="container box">
-        <div class="row">
-            <div class="col-md-4 box centered-form">
-                <form role="form" method="POST" action="{{ route('contact.store') }}">
-                    @csrf
-                    <div class="form-group">
-                        <label>
-                            <input type="text" name="contact-name" placeholder="@lang('common.name')"
-                                value="{{ auth()->user()->username }}" class="form-control" required>
-                        </label>
-                    </div>
-    
-                    <div class="form-group">
-                        <label>
-                            <input type="email" name="email" placeholder="@lang('common.email')"
-                                value="{{ auth()->user()->email }}" class="form-control" required>
-                        </label>
-                    </div>
-    
-                    <div class="form-group">
-                        <label>
-                            <textarea name="message" placeholder="@lang('common.message')" class="form-control" cols="30" rows="10"></textarea>
-                        </label>
-                    </div>
-    
-                    <button type="submit" class="btn btn-lg btn-primary btn-block">@lang('common.submit')</button>
-                </form>
-            </div>
-    
-            <div class="col-sm-8">
-                <div class="well well-sm mt-0">
-                    <p class="lead text-green text-center"><i class="{{ config('other.font-awesome') }} fa-star"></i>
-                        <strong>@lang('common.contact-header')</strong> <i
-                            class="{{ config('other.font-awesome') }} fa-star"></i></p>
-                    <p class="lead text-orange text-center">@lang('common.contact-desc').</p>
-                </div>
-            </div>
+@section('page', 'page__contact')
+
+@section('main')
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ __('common.contact') }}</h2>
+        <div class="panel__body">
+            <form class="form" action="{{ route('contact.store') }}" method="POST">
+                @csrf
+                <p class="form__group">
+                    <input
+                        id="contact-name"
+                        class="form__text"
+                        name="contact-name"
+                        placeholder=" "
+                        required
+                        type="text"
+                        value="{{ auth()->user()->username }}"
+                    />
+                    <label class="form__label form__label--floating" for="contact-name">
+                        {{ __('common.name') }}
+                    </label>
+                </p>
+                <p class="form__group">
+                    <input
+                        id="email"
+                        class="form__text"
+                        name="email"
+                        placeholder=" "
+                        required
+                        type="email"
+                        value="{{ auth()->user()->email }}"
+                    />
+                    <label class="form__label form__label--floating" for="email">
+                        {{ __('common.email') }}
+                    </label>
+                </p>
+                <p class="form__group">
+                    <textarea
+                        id="message"
+                        class="form__textarea"
+                        name="message"
+                        placeholder=" "
+                        required
+                    ></textarea>
+                    <label class="form__label form__label--floating" for="message">
+                        {{ __('common.message') }}
+                    </label>
+                </p>
+                <p class="form__group">
+                    <button class="form__button form__button--filled">
+                        {{ __('common.submit') }}
+                    </button>
+                </p>
+            </form>
         </div>
-    </div>
+    </section>
+@endsection
+
+@section('sidebar')
+    <section class="panelV2">
+        <h2 class="panel__heading">{{ __('common.contact-header') }}</h2>
+        <div class="panel__body">{{ __('common.contact-desc') }}</div>
+    </section>
 @endsection

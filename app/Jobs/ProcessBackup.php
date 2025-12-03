@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -17,6 +20,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Spatie\Backup\Config\Config;
 use Spatie\Backup\Tasks\Backup\BackupJobFactory;
 
 class ProcessBackup implements ShouldQueue
@@ -25,15 +29,17 @@ class ProcessBackup implements ShouldQueue
     use InteractsWithQueue;
     use Queueable;
 
-    public $timeout = 0;
+    public int $timeout = 0;
 
-    public function __construct(protected $option = '')
+    public function __construct(protected string $option = '')
     {
     }
 
-    public function handle()
+    public function handle(): void
     {
-        $backupJob = BackupJobFactory::createFromArray(config('backup'));
+        $config = Config::fromArray(config('backup'));
+
+        $backupJob = BackupJobFactory::createFromConfig($config);
 
         if ($this->option === 'only-db') {
             $backupJob->dontBackupFilesystem();
@@ -43,7 +49,7 @@ class ProcessBackup implements ShouldQueue
             $backupJob->dontBackupDatabases();
         }
 
-        if (! empty($this->option)) {
+        if (!empty($this->option)) {
             $prefix = str_replace('_', '-', $this->option).'-';
 
             $backupJob->setFilename($prefix.date('Y-m-d-H-i-s').'.zip');

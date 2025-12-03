@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,44 +17,47 @@
 namespace App\Http\Livewire;
 
 use App\Models\Torrent;
+use App\Models\User;
 use Livewire\Component;
 
 class BookmarkButton extends Component
 {
-    public $torrent;
-    public $user;
+    public Torrent $torrent;
 
-    final public function mount($torrent): void
-    {
-        $this->user = \auth()->user();
-        $this->torrent = Torrent::withAnyStatus()->findOrFail($torrent);
-    }
+    public User $user;
 
-    final public function getIsBookmarkedProperty(): int
-    {
-        return $this->torrent->bookmarked() ? 1 : 0;
-    }
+    public bool $isBookmarked;
+
+    public int $bookmarksCount;
 
     final public function store(): void
     {
-        if ($this->user->isBookmarked($this->torrent->id)) {
-            $this->dispatchBrowserEvent('error', ['type' => 'error',  'message' => 'Torrent Has Already Been Bookmarked!']);
+        if ($this->user->bookmarks()->where('torrent_id', '=', $this->torrent->id)->exists()) {
+            $this->dispatch('error', type: 'error', message: 'Torrent has already been bookmarked!');
 
             return;
         }
 
         $this->user->bookmarks()->attach($this->torrent->id);
-        $this->dispatchBrowserEvent('success', ['type' => 'success',  'message' => 'Torrent Has Been Bookmarked Successfully!']);
+        $this->isBookmarked = true;
+        $this->bookmarksCount++;
+        $this->dispatch('success', type: 'success', message: 'Torrent has been bookmarked successfully!');
+
+        Torrent::query()->whereKey($this->torrent->id)->searchable();
     }
 
     final public function destroy(): void
     {
         $this->user->bookmarks()->detach($this->torrent->id);
-        $this->dispatchBrowserEvent('success', ['type' => 'success',  'message' => 'Torrent Has Been Unbookmarked Successfully!']);
+        $this->isBookmarked = false;
+        $this->bookmarksCount--;
+        $this->dispatch('success', type: 'success', message: 'Torrent has been unbookmarked successfully!');
+
+        Torrent::query()->whereKey($this->torrent->id)->searchable();
     }
 
     final public function render(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Contracts\Foundation\Application
     {
-        return \view('livewire.bookmark-button');
+        return view('livewire.bookmark-button');
     }
 }

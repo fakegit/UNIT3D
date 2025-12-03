@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -15,128 +18,94 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Kyslik\ColumnSortable\Sortable;
+use DateTimeInterface;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use AllowDynamicProperties;
 
 /**
  * App\Models\History.
  *
- * @property int                             $id
  * @property int                             $user_id
- * @property string|null                     $agent
- * @property string                          $info_hash
- * @property int|null                        $uploaded
- * @property int|null                        $actual_uploaded
- * @property int|null                        $client_uploaded
- * @property int|null                        $downloaded
- * @property int|null                        $actual_downloaded
- * @property int|null                        $client_downloaded
+ * @property int                             $torrent_id
+ * @property string                          $agent
+ * @property int                             $uploaded
+ * @property int                             $actual_uploaded
+ * @property int                             $client_uploaded
+ * @property int                             $downloaded
+ * @property int                             $refunded_download
+ * @property int                             $actual_downloaded
+ * @property int                             $client_downloaded
  * @property int                             $seeder
  * @property int                             $active
  * @property int                             $seedtime
  * @property int                             $immune
- * @property int                             $hitrun
- * @property int                             $prewarn
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property \Illuminate\Support\Carbon|null $completed_at
- * @property-read \App\Models\Torrent $torrent
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History sortable($defaultParameters = null)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereActive($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereActualDownloaded($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereActualUploaded($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereAgent($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereClientDownloaded($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereClientUploaded($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereCompletedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereDownloaded($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereHitrun($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereImmune($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereInfoHash($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History wherePrewarn($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereSeeder($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereSeedtime($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereUploaded($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\History whereUserId($value)
- * @mixin \Eloquent
+ * @property bool                            $hitrun
+ * @property \Illuminate\Support\Carbon|null $prewarned_at
  */
-class History extends Model
+#[AllowDynamicProperties]
+final class History extends Model
 {
+    /** @use HasFactory<\Database\Factories\HistoryFactory> */
     use HasFactory;
-    use Sortable;
+    use SoftDeletes;
 
     /**
-     * The Columns That Are Sortable.
-     *
-     * @var array
-     */
-    public $sortable = [
-        'id',
-        'agent',
-        'active',
-        'seeder',
-        'uploaded',
-        'downloaded',
-        'seedtime',
-        'created_at',
-        'updated_at',
-        'completed_at',
-        'prewarn',
-        'hitrun',
-        'immune',
-    ];
-
-    /**
-     * The Database Table Used By The Model.
+     * The table associated with the model.
      *
      * @var string
      */
     protected $table = 'history';
 
     /**
-     * The Attributes That Are Mass Assignable.
+     * The attributes that aren't mass assignable.
      *
-     * @var array
+     * @var string[]
      */
-    protected $fillable = [
-        'user_id',
-        'info_hash',
-    ];
+    protected $guarded = [];
 
     /**
-     * The Attributes That Should Be Mutated To Dates.
+     * Get the attributes that should be cast.
      *
-     * @var array
+     * @return array{completed_at: 'datetime', hitrun: 'bool', prewarned_at: 'datetime'}
      */
-    protected $dates = ['completed_at'];
+    protected function casts(): array
+    {
+        return [
+            'completed_at' => 'datetime',
+            'hitrun'       => 'bool',
+            'prewarned_at' => 'datetime',
+        ];
+    }
 
     /**
-     * Belongs To A User.
+     * Get the user associated with the history.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withDefault([
             'username' => 'System',
-            'id'       => '1',
+            'id'       => User::SYSTEM_USER_ID,
         ]);
     }
 
     /**
-     * Belongs To A Torrent.
+     * Get the torrent associated with the history.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<Torrent, $this>
      */
-    public function torrent()
+    public function torrent(): BelongsTo
     {
-        return $this->belongsTo(Torrent::class, 'info_hash', 'info_hash');
+        return $this->belongsTo(Torrent::class);
+    }
+
+    /**
+     * Prepare a date for array / JSON serialization.
+     */
+    protected function serializeDate(DateTimeInterface $date): string
+    {
+        return $date->format('Y-m-d H:i:s');
     }
 }

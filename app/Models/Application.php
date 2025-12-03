@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -13,10 +16,14 @@
 
 namespace App\Models;
 
+use App\Enums\ModerationStatus;
+use App\Models\Scopes\ApprovedScope;
 use App\Traits\Auditable;
-use Hootlex\Moderation\Moderatable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use AllowDynamicProperties;
 
 /**
  * App\Models\Application.
@@ -25,76 +32,82 @@ use Illuminate\Database\Eloquent\Model;
  * @property string                          $type
  * @property string                          $email
  * @property string|null                     $referrer
- * @property int                             $status
+ * @property ModerationStatus                $status
  * @property \Illuminate\Support\Carbon|null $moderated_at
  * @property int|null                        $moderated_by
  * @property int|null                        $accepted_by
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\ApplicationImageProof[] $imageProofs
- * @property-read int|null $image_proofs_count
- * @property-read \App\Models\User|null $moderated
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\ApplicationUrlProof[] $urlProofs
- * @property-read int|null $url_proofs_count
- * @property-read \App\Models\User $user
- *
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Application newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Application newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Application query()
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Application whereAcceptedBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Application whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Application whereEmail($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Application whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Application whereModeratedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Application whereModeratedBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Application whereReferrer($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Application whereStatus($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Application whereType($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Application whereUpdatedAt($value)
- * @mixin \Eloquent
  */
-class Application extends Model
+#[AllowDynamicProperties]
+final class Application extends Model
 {
-    use HasFactory;
-    use Moderatable;
     use Auditable;
 
+    /** @use HasFactory<\Database\Factories\ApplicationFactory> */
+    use HasFactory;
+
     /**
-     * Belongs To A User.
+     * Get the attributes that should be cast.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return array{moderated_at: 'datetime', status: class-string<ModerationStatus>}
      */
-    public function user()
+    protected function casts(): array
+    {
+        return [
+            'moderated_at' => 'datetime',
+            'status'       => ModerationStatus::class,
+        ];
+    }
+
+    /**
+     * The attributes that aren't mass assignable.
+     *
+     * @var string[]
+     */
+    protected $guarded = ['id', 'created_at', 'updated_at'];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new ApprovedScope());
+    }
+
+    /**
+     * Get the user that owns the application.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
     /**
-     * Application Has Been Moderated By.
+     * Get the user that moderated the application.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function moderated()
+    public function moderated(): BelongsTo
     {
         return $this->belongsTo(User::class, 'moderated_by');
     }
 
     /**
-     * A Application Has Many Image Proofs.
+     * Get the image proofs for the application.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<ApplicationImageProof, $this>
      */
-    public function imageProofs()
+    public function imageProofs(): HasMany
     {
         return $this->hasMany(ApplicationImageProof::class);
     }
 
     /**
-     * A Application Has Many URL Proofs.
+     * Get the URL proofs for the application.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<ApplicationUrlProof, $this>
      */
-    public function urlProofs()
+    public function urlProofs(): HasMany
     {
         return $this->hasMany(ApplicationUrlProof::class);
     }

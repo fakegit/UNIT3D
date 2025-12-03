@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -14,9 +17,10 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Staff\StoreTypeRequest;
+use App\Http\Requests\Staff\UpdateTypeRequest;
 use App\Models\Type;
-use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use Exception;
 
 /**
  * @see \Tests\Feature\Http\Controllers\Staff\TypeControllerTest
@@ -28,9 +32,9 @@ class TypeController extends Controller
      */
     public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $types = Type::all()->sortBy('position');
-
-        return \view('Staff.type.index', ['types' => $types]);
+        return view('Staff.type.index', [
+            'types' => Type::orderBy('position')->get(),
+        ]);
     }
 
     /**
@@ -38,95 +42,51 @@ class TypeController extends Controller
      */
     public function create(): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        return \view('Staff.type.create');
+        return view('Staff.type.create');
     }
 
     /**
      * Store A New Type.
-     *
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function store(Request $request)
+    public function store(StoreTypeRequest $request): \Illuminate\Http\RedirectResponse
     {
-        $type = new Type();
-        $type->name = $request->input('name');
-        $type->slug = Str::slug($type->name);
-        $type->position = $request->input('position');
+        Type::create($request->validated());
 
-        $v = \validator($type->toArray(), [
-            'name'     => 'required',
-            'slug'     => 'required',
-            'position' => 'required',
-        ]);
-
-        if ($v->fails()) {
-            return \redirect()->route('staff.types.index')
-                ->withErrors($v->errors());
-        }
-        $type->save();
-
-        return \redirect()->route('staff.types.index')
-            ->withSuccess('Type Successfully Added');
+        return to_route('staff.types.index')
+            ->with('success', 'Type successfully added');
     }
 
     /**
      * Type Edit Form.
-     *
-     * @param \App\Models\Type $id
      */
-    public function edit($id): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+    public function edit(Type $type): \Illuminate\Contracts\View\Factory|\Illuminate\View\View
     {
-        $type = Type::findOrFail($id);
-
-        return \view('Staff.type.edit', ['type' => $type]);
+        return view('Staff.type.edit', [
+            'type' => $type,
+        ]);
     }
 
     /**
      * Edit A Type.
-     *
-     * @param \App\Models\Type $id
-     *
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function update(Request $request, $id)
+    public function update(UpdateTypeRequest $request, Type $type): \Illuminate\Http\RedirectResponse
     {
-        $type = Type::findOrFail($id);
-        $type->name = $request->input('name');
-        $type->slug = Str::slug($type->name);
-        $type->position = $request->input('position');
+        $type->update($request->validated());
 
-        $v = \validator($type->toArray(), [
-            'name'     => 'required',
-            'slug'     => 'required',
-            'position' => 'required',
-        ]);
-
-        if ($v->fails()) {
-            return \redirect()->route('staff.types.index')
-                ->withErrors($v->errors());
-        }
-        $type->save();
-
-        return \redirect()->route('staff.types.index')
-            ->withSuccess('Type Successfully Modified');
+        return to_route('staff.types.index')
+            ->with('success', 'Type successfully modified');
     }
 
     /**
      * Delete A Type.
      *
-     * @param \App\Models\Type $id
-     *
-     * @throws \Exception
-     *
-     * @return \Illuminate\Http\RedirectResponse
+     * @throws Exception
      */
-    public function destroy($id)
+    public function destroy(Type $type): \Illuminate\Http\RedirectResponse
     {
-        $type = Type::findOrFail($id);
         $type->delete();
 
-        return \redirect()->route('staff.types.index')
-            ->withSuccess('Type Successfully Deleted');
+        return to_route('staff.types.index')
+            ->with('success', 'Type successfully deleted');
     }
 }

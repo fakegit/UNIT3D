@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * NOTICE OF LICENSE.
  *
@@ -12,7 +14,6 @@
  */
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Replace list
@@ -32,7 +33,6 @@ return [
     |
     */
     'replace' => [
-        //
     ],
 
     /*
@@ -73,5 +73,4 @@ return [
         'tittiefucker', 'titties', 'tittyfuck', 'tittywank', 'titwank', 'tosser', 'turd', 'tw4t', 'twat', 'twathead', 'twatty', 'twunt', 'twunter', 'v14gra', 'v1gra', 'vagina', 'viagra', 'vulva', 'w00se', 'wang',
         'wank', 'wanker', 'wanky', 'whoar', 'whore', 'willy',
     ],
-
 ];

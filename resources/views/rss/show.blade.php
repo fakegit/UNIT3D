@@ -1,5 +1,5 @@
 @php
-    echo '<?xml version="1.0" encoding="UTF-8" ?>'
+    echo '<?xml version="1.0" encoding="UTF-8" ?>';
 @endphp
 <rss version="2.0"
      xmlns:atom="http://www.w3.org/2005/Atom"
@@ -9,57 +9,71 @@
         <title>{{ config('other.title') }}: {{ $rss->name }}</title>
         <link>{{ config('app.url') }}</link>
         <description>
-            <![CDATA[This feed contains your secure RSS PID, please do not share with anyone.]]>
+            {{ __('This feed contains your secure rsskey, please do not share with anyone.') }}
         </description>
-        <atom:link href="{{ route('rss.show.rsskey', ['id' => $rss->id, 'rsskey' => $user->rsskey]) }}" type="application/rss+xml" rel="self"></atom:link>
+        <atom:link href="{{ route('rss.show.rsskey', ['id' => $rss->id, 'rsskey' => $user->rsskey]) }}"
+                   type="application/rss+xml" rel="self"></atom:link>
         <copyright>{{ config('other.title') }} {{ now()->year }}</copyright>
-        <language>en</language>
+        <language>en-us</language>
         <lastBuildDate>{{ now()->toRssString() }}</lastBuildDate>
-        <ttl>600</ttl>
+        <ttl>5</ttl>
         @if($torrents)
-            @foreach($torrents as $data)
+            @foreach($torrents as $torrent)
                 <item>
-                    <title>{{ $data->name }}</title>
-                    <category>{{ $data->category->name }}</category>
-                    <link>{{ route('torrent', ['id' => $data->id ]) }}</link>
-                    <guid isPermaLink="true">{{ route('torrent', ['id' => $data->id ]) }}</guid>
-                    <description><![CDATA[<p>
-                            <strong>Name</strong>: {{ $data->name }}<br>
-                            <strong>Category</strong>: {{ $data->category->name }}<br>
-                            <strong>Type</strong>: {{ $data->type->name }}<br>
-                            <strong>Resolution</strong>: {{ $data->resolution->name ?? 'No Res' }}<br>
-                            <strong>Size</strong>: {{ $data->getSize() }}<br>
-                            <strong>Uploaded</strong>: {{ $data->created_at->diffForHumans() }}<br>
-                            <strong>Seeders</strong>: {{ $data->seeders }} | <strong>Leechers</strong>: {{ $data->leechers }} | <strong>Completed</strong>: {{ $data->times_completed }}<br>
+                    <title>{{ $torrent['name'] }}</title>
+                    <category>{{ $torrent['category']['name'] }}</category>
+                    <contentlength>{{ $torrent['size'] }}</contentlength>
+                    <link>{{ route('torrent.download.rsskey', ['id' => $torrent['id'], 'rsskey' => $user->rsskey ]) }}</link>
+                    <guid>{{ $torrent['id'] }}</guid>
+                    <description>
+                        <![CDATA[<p>
+                            <strong>Name</strong>: {{ $torrent['name'] }}<br>
+                            <strong>Category</strong>: {{ $torrent['category']['name'] }}<br>
+                            <strong>Type</strong>: {{ $torrent['type']['name'] }}<br>
+                            <strong>Resolution</strong>: {{ $torrent['resolution']['name'] ?? 'No res' }}<br>
+                            <strong>Size</strong>: {{ App\Helpers\StringHelper::formatBytes($torrent['size'], 2) }}<br>
+                            <strong>Uploaded</strong>: {{ \Illuminate\Support\Carbon::createFromTimestampUTC($torrent['created_at'])->diffForHumans() }}<br>
+                            <strong>Seeders</strong>: {{ $torrent['seeders'] }} |
+                            <strong>Leechers</strong>: {{ $torrent['leechers'] }} |
+                            <strong>Completed</strong>: {{ $torrent['times_completed'] }}<br>
                             <strong>Uploader</strong>:
-                            @if(!$data->anon && $data->user)
-                                @lang('torrent.uploaded-by') {{ $data->user->username }}
+                            @if(!$torrent['anon'] && $torrent['user'])
+                                {{ __('torrent.uploaded-by') }} {{ $torrent['user']['username'] }}
                             @else
-                                @lang('common.anonymous') @lang('torrent.uploader')
+                                {{ __('common.anonymous') }} {{ __('torrent.uploader') }}
                             @endif<br>
-                            @if (($data->category->movie_meta || $data->category->tv_meta) && $data->imdb != 0)
-                                IMDB Link:<a href="https://anon.to?http://www.imdb.com/title/tt{{ $data->imdb }}" target="_blank">tt{{ $data->imdb }}</a><br>
+                            @if (($torrent['category']['movie_meta'] || $torrent['category']['tv_meta']) && $torrent['imdb'] != 0)
+                                IMDB link:<a href="https://anon.to?http://www.imdb.com/title/tt{{ \str_pad((string) $torrent['imdb'], 7, '0', STR_PAD_LEFT) }}"
+                                             target="_blank">tt{{ $torrent['imdb'] }}</a><br>
                             @endif
-                            @if ($data->category->movie_meta && $data->tmdb != 0)
-                                TMDB Link: <a href="https://anon.to?https://www.themoviedb.org/movie/{{ $data->tmdb }}" target="_blank">{{ $data->tmdb }}</a><br>
-                            @elseif ($data->category->tv_meta && $data->tmdb != 0)
-                                TMDB Link: <a href="https://anon.to?https://www.themoviedb.org/tv/{{ $data->tmdb }}" target="_blank">{{ $data->tmdb }}</a><br>
+                            @if ($torrent['category']['movie_meta'] && $torrent['tmdb_movie_id'] > 0)
+                                TMDB link: <a href="https://anon.to?https://www.themoviedb.org/movie/{{ $torrent['tmdb_movie_id'] }}"
+                                              target="_blank">{{ $torrent['tmdb_movie_id'] }}</a><br>
+                            @elseif ($torrent['category']['tv_meta'] && $torrent['tmdb_tv_id'] > 0)
+                                TMDB link: <a href="https://anon.to?https://www.themoviedb.org/tv/{{ $torrent['tmdb_tv_id'] }}"
+                                              target="_blank">{{ $torrent['tmdb_tv_id'] }}</a><br>
+                            @endif
+                            @if (($torrent['category']['tv_meta']) && $torrent['tvdb'] != 0)
+                                TVDB link:<a href="https://anon.to?https://www.thetvdb.com/?tab=series&id={{ $torrent['tvdb'] }}"
+                                             target="_blank">{{ $torrent['tvdb'] }}</a><br>
+                            @endif
+                            @if (($torrent['category']['movie_meta'] || $torrent['category']['tv_meta']) && $torrent['mal'] != 0)
+                                MAL link:<a href="https://anon.to?https://myanimelist.net/anime/{{ $torrent['mal'] }}"
+                                             target="_blank">{{ $torrent['mal'] }}</a><br>
+                            @endif
+                            @if ($torrent['internal'] == 1)
+                                <comments>This is a high quality internal release!</comments>
                             @endif
                         </p>]]>
                     </description>
                     <dc:creator xmlns:dc="http://purl.org/dc/elements/1.1/">
-                        @if(!$data->anon && $data->user)
-                            @lang('torrent.uploaded-by') {{ $data->user->username }}
+                        @if(!$torrent['anon'] && $torrent['user'])
+                            {{ __('torrent.uploaded-by') }} {{ $torrent['user']['username'] }}
                         @else
-                            @lang('common.anonymous') @lang('torrent.uploader')
+                            {{ __('common.anonymous') }} {{ __('torrent.uploader') }}
                         @endif
                     </dc:creator>
-                    <pubDate>{{ $data->created_at->toRssString() }}</pubDate>
-                    <enclosure
-                            url="{{ route('torrent.download.rsskey', ['id' => $data->id, 'rsskey' => $user->rsskey ]) }}"
-                            type="application/x-bittorrent"
-                            length="39399"
-                    />
+                    <pubDate>{{ \Illuminate\Support\Carbon::createFromTimestampUTC($torrent['created_at'])->toRssString() }}</pubDate>
                 </item>
             @endforeach
         @endif

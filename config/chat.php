@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * NOTICE OF LICENSE.
  *
@@ -12,7 +14,6 @@
  */
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Which chatroom should system messages be routed to ?
@@ -47,5 +48,4 @@ return [
     */
 
     'nerd_bot' => true,
-
 ];

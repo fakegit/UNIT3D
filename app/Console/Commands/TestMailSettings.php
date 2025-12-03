@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,10 +19,9 @@ namespace App\Console\Commands;
 use App\Mail\TestEmail;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
+use Exception;
+use Throwable;
 
-/**
- * @see \Tests\Todo\Unit\Console\Commands\TestMailSettingsTest
- */
 class TestMailSettings extends Command
 {
     /**
@@ -27,35 +29,37 @@ class TestMailSettings extends Command
      *
      * @var string
      */
-    protected $signature = 'test:email';
+    protected $signature = 'test:email {--force}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Send A Test Email To Owner Account Using The Current Mail Configuration';
+    protected $description = 'Send a test email to owner account using the current mail configuration';
 
     /**
      * Execute the console command.
      *
-     * @return mixed
+     * @throws Exception|Throwable If there is an error during the execution of the command.
      */
-    public function handle()
+    final public function handle(): void
     {
-        $owner = \config('other.email');
+        $owner = config('other.email');
 
-        $this->info('Sending Test Email To '.$owner);
-        \sleep(5);
+        $this->info('Sending test email to '.$owner);
 
-        try {
-            Mail::to($owner)->send(new TestEmail());
-        } catch (\Exception) {
-            $this->error('Failed!');
-            $this->alert('Email failed to send. Please review your mail configs in the .env file.');
-            exit(1);
+        if ($this->option('force') || $this->confirm('Do you wish to continue?', true)) {
+            try {
+                Mail::to($owner)->send(new TestEmail());
+            } catch (Exception) {
+                $this->error('Failed!');
+                $this->alert('Email failed to send. Please review your mail configs in the .env file.');
+
+                exit(1);
+            }
+
+            $this->alert('Email was successfully sent!');
         }
-
-        $this->alert('Email Was Successfully Sent!');
     }
 }

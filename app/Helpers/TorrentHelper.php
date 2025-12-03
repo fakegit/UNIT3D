@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -26,55 +29,76 @@ use App\Achievements\UserMade800Uploads;
 use App\Achievements\UserMade900Uploads;
 use App\Achievements\UserMadeUpload;
 use App\Bots\IRCAnnounceBot;
-use App\Models\Follow;
-use App\Models\PrivateMessage;
+use App\Bots\IRCAnnounceBotExternal;
+use App\Enums\ModerationStatus;
+use App\Models\AutomaticTorrentFreeleech;
+use App\Models\TmdbMovie;
+use App\Models\Scopes\ApprovedScope;
 use App\Models\Torrent;
+use App\Models\TmdbTv;
 use App\Models\User;
-use App\Models\Wish;
 use App\Notifications\NewUpload;
-use Carbon\Carbon;
+use App\Notifications\NewWishListNotice;
+use App\Services\Unit3dAnnounce;
+use Illuminate\Support\Carbon;
 
 class TorrentHelper
 {
-    public static function approveHelper($id)
+    public static function approveHelper(int $id): void
     {
-        $appurl = \config('app.url');
-        $appname = \config('app.name');
+        $appurl = config('app.url');
 
-        Torrent::approve($id);
-        $torrent = Torrent::with('uploader')->withAnyStatus()->where('id', '=', $id)->first();
+        $torrent = Torrent::with('user')->withoutGlobalScope(ApprovedScope::class)->findOrFail($id);
         $torrent->created_at = Carbon::now();
         $torrent->bumped_at = Carbon::now();
-        $torrent->save();
+        $torrent->status = ModerationStatus::APPROVED;
+        $torrent->moderated_at = now();
+        $torrent->moderated_by = (int) auth()->id();
 
-        $uploader = $torrent->uploader;
+        if (!$torrent->free) {
+            $autoFreeleeches = AutomaticTorrentFreeleech::query()
+                ->orderBy('position')
+                ->where(fn ($query) => $query->whereNull('category_id')->orWhere('category_id', '=', $torrent->category_id))
+                ->where(fn ($query) => $query->whereNull('type_id')->orWhere('type_id', '=', $torrent->type_id))
+                ->where(fn ($query) => $query->whereNull('resolution_id')->orWhere('resolution_id', '=', $torrent->resolution_id))
+                ->where(fn ($query) => $query->whereNull('size')->orWhere('size', '<', $torrent->size))
+                ->get();
 
-        $wishes = Wish::where('tmdb', '=', $torrent->tmdb)->whereNull('source')->get();
-        if ($wishes) {
-            foreach ($wishes as $wish) {
-                $wish->source = \sprintf('%s/torrents/%s', $appurl, $torrent->id);
-                $wish->save();
+            foreach ($autoFreeleeches as $autoFreeleech) {
+                if ($autoFreeleech->name_regex === null || preg_match($autoFreeleech->name_regex, $torrent->name)) {
+                    $torrent->free = $autoFreeleech->freeleech_percentage;
 
-                // Send Private Message
-                $pm = new PrivateMessage();
-                $pm->sender_id = 1;
-                $pm->receiver_id = $wish->user_id;
-                $pm->subject = 'Wish List Notice!';
-                $pm->message = \sprintf('The following item, %s, from your wishlist has been uploaded to %s! You can view it [url=%s/torrents/', $wish->title, $appname, $appurl).$torrent->id.'] HERE [/url]
-                                [color=red][b]THIS IS AN AUTOMATED SYSTEM MESSAGE, PLEASE DO NOT REPLY![/b][/color]';
-                $pm->save();
+                    break;
+                }
             }
         }
 
-        if ($torrent->anon == 0) {
-            $followers = Follow::where('target_id', '=', $torrent->user_id)->get();
-            if ($followers) {
-                foreach ($followers as $follower) {
-                    $pushto = User::with('notification')->find($follower->user_id);
-                    if ($pushto->acceptsNotification($uploader, $pushto, 'following', 'show_following_upload')) {
-                        $pushto->notify(new NewUpload('follower', $torrent));
-                    }
-                }
+        $torrent->save();
+
+        $uploader = $torrent->user;
+
+        switch (true) {
+            case $torrent->tmdb_movie_id !== null:
+                User::query()
+                    ->whereRelation('wishes', 'tmdb_movie_id', '=', $torrent->tmdb_movie_id)
+                    ->get()
+                    ->each
+                    ->notify(new NewWishListNotice($torrent));
+
+                break;
+            case $torrent->tmdb_tv_id !== null:
+                User::query()
+                    ->whereRelation('wishes', 'tmdb_tv_id', '=', $torrent->tmdb_tv_id)
+                    ->get()
+                    ->each
+                    ->notify(new NewWishListNotice($torrent));
+
+                break;
+        }
+
+        if (!$torrent->anon && $uploader !== null) {
+            foreach ($uploader->followers()->get() as $follower) {
+                $follower->notify(new NewUpload('follower', $torrent));
             }
         }
 
@@ -82,9 +106,9 @@ class TorrentHelper
         $username = $user->username;
         $anon = $torrent->anon;
 
-        if ($anon == 0) {
+        if (!$anon) {
             // Achievements
-            $user->unlock(new UserMadeUpload(), 1);
+            $user->unlock(new UserMadeUpload());
             $user->addProgress(new UserMade25Uploads(), 1);
             $user->addProgress(new UserMade50Uploads(), 1);
             $user->addProgress(new UserMade100Uploads(), 1);
@@ -99,18 +123,36 @@ class TorrentHelper
         }
 
         // Announce To IRC
-        if (\config('irc-bot.enabled') == true) {
-            $appname = \config('app.name');
-            $ircAnnounceBot = new IRCAnnounceBot();
-            if ($anon == 0) {
-                $ircAnnounceBot->message(\config('irc-bot.channel'), '['.$appname.'] User '.$username.' has uploaded '.$torrent->name.' grab it now!');
-                $ircAnnounceBot->message(\config('irc-bot.channel'), '[Category: '.$torrent->category->name.'] [Type: '.$torrent->type->name.'] [Size:'.$torrent->getSize().']');
-                $ircAnnounceBot->message(\config('irc-bot.channel'), \sprintf('[Link: %s/torrents/', $appurl).$id.']');
-            } else {
-                $ircAnnounceBot->message(\config('irc-bot.channel'), '['.$appname.'] An anonymous user has uploaded '.$torrent->name.' grab it now!');
-                $ircAnnounceBot->message(\config('irc-bot.channel'), '[Category: '.$torrent->category->name.'] [Type: '.$torrent->type->name.'] [Size: '.$torrent->getSize().']');
-                $ircAnnounceBot->message(\config('irc-bot.channel'), \sprintf('[Link: %s/torrents/', $appurl).$id.']');
+        if (config('irc-bot.enabled')) {
+            $meta = null;
+            $category = $torrent->category;
+
+            if ($torrent->tmdb_movie_id > 0 || $torrent->tmdb_tv_id > 0) {
+                $meta = match (true) {
+                    $category->tv_meta    => TmdbTv::find($torrent->tmdb_tv_id),
+                    $category->movie_meta => TmdbMovie::find($torrent->tmdb_movie_id),
+                    default               => null,
+                };
             }
+
+            (new IRCAnnounceBot())
+                ->to(config('irc-bot.channel'))
+                ->say('['.config('app.name').'] '.($anon ? 'An anonymous user' : $username).' has uploaded '.$torrent->name.' grab it now!')
+                ->say(
+                    '[Category: '.$category->name.'] '
+                    .'[Type: '.$torrent->type->name.'] '
+                    .'[Size: '.$torrent->getSize().'] '
+                    .'[TMDB vote average: '.($meta->vote_average ?? 0).'] '
+                    .'[TMDB vote count: '.($meta->vote_count ?? 0).']'
+                )
+                ->say(\sprintf('[Link: %s/torrents/', $appurl).$id.']');
         }
+
+        // Announce to external IRC service
+        IRCAnnounceBotExternal::postAnnounceMsg($torrent);
+
+        cache()->forget('announce-torrents:by-infohash:'.$torrent->info_hash);
+
+        Unit3dAnnounce::addTorrent($torrent);
     }
 }

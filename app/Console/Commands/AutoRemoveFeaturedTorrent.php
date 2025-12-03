@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * NOTICE OF LICENSE.
  *
@@ -16,18 +19,18 @@ namespace App\Console\Commands;
 use App\Models\FeaturedTorrent;
 use App\Models\Torrent;
 use App\Repositories\ChatRepository;
-use Carbon\Carbon;
+use App\Services\Unit3dAnnounce;
+use Exception;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
+use Throwable;
 
-/**
- * @see \Tests\Unit\Console\Commands\AutoRemoveFeaturedTorrentTest
- */
 class AutoRemoveFeaturedTorrent extends Command
 {
     /**
      * AutoRemoveFeaturedTorrent Constructor.
      */
-    public function __construct(private ChatRepository $chatRepository)
+    public function __construct(private readonly ChatRepository $chatRepository)
     {
         parent::__construct();
     }
@@ -44,38 +47,40 @@ class AutoRemoveFeaturedTorrent extends Command
      *
      * @var string
      */
-    protected $description = 'Automatically Removes Featured Torrents If Expired';
+    protected $description = 'Automatically removes featured torrents if expired';
 
     /**
      * Execute the console command.
      *
-     * @return mixed
+     * @throws Exception|Throwable If there is an error during the execution of the command.
      */
-    public function handle()
+    final public function handle(): void
     {
         $current = Carbon::now();
-        $featuredTorrents = FeaturedTorrent::where('created_at', '<', $current->copy()->subDays(7)->toDateTimeString())->get();
+        $featuredTorrents = FeaturedTorrent::with('torrent')->where('created_at', '<', $current->copy()->subDays(7))->get();
 
         foreach ($featuredTorrents as $featuredTorrent) {
             // Find The Torrent
-            $torrent = Torrent::where('featured', '=', 1)->where('id', '=', $featuredTorrent->torrent_id)->first();
-            if (isset($torrent)) {
-                $torrent->free = 0;
-                $torrent->doubleup = 0;
-                $torrent->featured = 0;
-                $torrent->save();
+
+            if ($featuredTorrent->torrent !== null) {
+                $featuredTorrent->delete();
 
                 // Auto Announce Featured Expired
-                $appurl = \config('app.url');
+                $appurl = config('app.url');
 
                 $this->chatRepository->systemMessage(
-                    \sprintf('Ladies and Gents, [url=%s/torrents/%s]%s[/url] is no longer featured. :poop:', $appurl, $torrent->id, $torrent->name)
+                    \sprintf('Ladies and Gents, [url=%s/torrents/%s]%s[/url] is no longer featured.', $appurl, $featuredTorrent->torrent_id, $featuredTorrent->torrent->name)
                 );
+
+                Unit3dAnnounce::removeFeaturedTorrent($featuredTorrent->torrent_id);
             }
 
             // Delete The Record From DB
             $featuredTorrent->delete();
         }
-        $this->comment('Automated Removal Featured Torrents Command Complete');
+
+        cache()->forget('featured-torrent-ids');
+
+        $this->comment('Automated removal featured torrents command complete');
     }
 }
